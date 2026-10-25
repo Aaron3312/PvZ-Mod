@@ -73,6 +73,9 @@
 #include "widget/Checkbox.h"
 #include "widget/Dialog.h"
 #include "SexyAppFramework/resource.h"
+#ifdef PVZ_HACK_MENU
+#include "Mods/Mods.h"
+#endif
 
 bool gIsPartnerBuild = false;
 bool gSlowMo = false;
@@ -1576,10 +1579,19 @@ void LawnApp::UpdateFrames()
 	{
 		aUpdateCount = 20;
 	}
+#ifdef PVZ_HACK_MENU
+	else
+	{
+		aUpdateCount = Mods::UpdatesPerFrame();
+	}
+#endif
 
 	for (int i = 0; i < aUpdateCount; i++)
 	{
 		mAppCounter++;
+#ifdef PVZ_HACK_MENU
+		Mods::OnUpdate(this);
+#endif
 
 		if (mBoard)
 		{

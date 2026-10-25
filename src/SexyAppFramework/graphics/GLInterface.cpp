@@ -36,6 +36,9 @@
 #include <cstring>
 #include <mutex>
 #include <vector>
+#ifdef PVZ_HACK_MENU
+#include "Mods/HackMenu.h"
+#endif
 
 constexpr const int MAX_VERTICES = 16384;
 
@@ -1328,6 +1331,13 @@ int GLInterface::Init(bool IsWindowed)
 
 bool GLInterface::Redraw(Rect*)
 {
+#ifdef PVZ_HACK_MENU
+	GfxFlush();
+	HackMenu::Render();
+	// ImGui restores the GL state it touched; drop the caches anyway so the next batch rebinds.
+	gAppliedStateValid = false;
+	gAppliedTextureValid = false;
+#endif
 	Flush();
 	return true;
 }

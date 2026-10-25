@@ -31,6 +31,9 @@
 #include "graphics/GLImage.h"
 #include "widget/WidgetManager.h"
 #include "misc/KeyCodes.h"
+#ifdef PVZ_HACK_MENU
+#include "Mods/HackMenu.h"
+#endif
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -616,6 +619,11 @@ bool SexyAppBase::ProcessDeferredMessages(bool singleMessage)
 
 			return SDL_HasEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
 		}
+
+#ifdef PVZ_HACK_MENU
+		if (HackMenu::ProcessEvent(event))
+			return SDL_HasEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
+#endif
 
 		switch(event.type)
 		{

@@ -456,3 +456,6 @@ build-*/
 
 # Game recordings
 *.dmo
+
+# app de macOS de scripts/make-macos-app.sh
+/dist/

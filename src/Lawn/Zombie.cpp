@@ -43,6 +43,9 @@
 #include "../PvzpLib/Reanimator.h"
 #include "../PvzpLib/Attachment.h"
 #include "../PvzpLib/PvzpParticle.h"
+#ifdef PVZ_HACK_MENU
+#include "Mods/Mods.h"
+#endif
 #include <algorithm>
 
 constexpr const int ZOMBIE_START_RANDOM_OFFSET = 40;
@@ -902,6 +905,9 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 		StartZombieSound();
 	}
 
+#ifdef PVZ_HACK_MENU
+	Mods::ScaleZombieHealth(this);
+#endif
 	UpdateReanim();
 }
 
@@ -7972,6 +7978,9 @@ void Zombie::TakeDamage(int theDamage, unsigned int theDamageFlags)
 	if (mZombiePhase == ZombiePhase::PHASE_JACK_IN_THE_BOX_POPPING || IsDeadOrDying())
 		return;
 
+#ifdef PVZ_HACK_MENU
+	theDamage = Mods::ScaleDamage(theDamage);
+#endif
 	int aDamageRemaining = theDamage;
 
 	if (IsFlying())

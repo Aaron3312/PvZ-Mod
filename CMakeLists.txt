@@ -123,6 +123,28 @@ endif()
 option(PVZ_DEBUG "Enable PVZ_DEBUG macro to enable cheats, hidden features, etc." ${PVZ_DEBUG_DEFAULT})
 option(CONSOLE "Show console on Windows" ${WIN_CONSOLE_DEFAULT})
 option(DO_FIX_BUGS "Define DO_FIX_BUGS macro (Community fixes for original game bugs of 1.2.0.1073 GOTY Edition)" OFF)
+option(PVZ_HACK_MENU "In-game cheat menu (Dear ImGui) and mods, desktop builds only" ON)
+if(PVZ_HACK_MENU AND (ANDROID OR IOS OR EMSCRIPTEN OR NINTENDO_SWITCH))
+	set(PVZ_HACK_MENU OFF)
+endif()
+if(PVZ_HACK_MENU)
+	set(IMGUI_DIR ${PROJECT_SOURCE_DIR}/third_party/imgui)	# Dear ImGui v1.93.0 (c1aaac6)
+	file(GLOB MOD_SOURCES CONFIGURE_DEPENDS src/Mods/*.cpp)
+	list(APPEND SOURCES
+		${MOD_SOURCES}
+		${IMGUI_DIR}/imgui.cpp
+		${IMGUI_DIR}/imgui_draw.cpp
+		${IMGUI_DIR}/imgui_tables.cpp
+		${IMGUI_DIR}/imgui_widgets.cpp
+		${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
+		${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+	)
+	# ES2 mode: no VAOs (missing on the macOS GL 2.1 fallback), and the shim routes GL calls through glad.
+	set_source_files_properties(${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp PROPERTIES
+		COMPILE_DEFINITIONS IMGUI_IMPL_OPENGL_ES2
+		INCLUDE_DIRECTORIES ${IMGUI_DIR}/gles2_shim
+	)
+endif()
 
 if(EMSCRIPTEN)
 	list(PREPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMake")
@@ -198,6 +220,10 @@ target_compile_definitions(pvz-portable PRIVATE
 	$<$<BOOL:${DO_FIX_BUGS}>:DO_FIX_BUGS>
 )
 target_compile_features(pvz-portable PRIVATE cxx_std_20)
+if(PVZ_HACK_MENU)
+	target_compile_definitions(pvz-portable PRIVATE PVZ_HACK_MENU)
+	target_include_directories(pvz-portable PRIVATE ${IMGUI_DIR})
+endif()
 set_target_properties(pvz-portable PROPERTIES CXX_EXTENSIONS OFF)
 
 if (LOW_MEMORY)

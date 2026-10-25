@@ -24,6 +24,9 @@
 #include <SDL.h>
 #include <format>
 #include "ZenGarden.h"
+#ifdef PVZ_HACK_MENU
+#include "Mods/Mods.h"
+#endif
 #include "BoardInclude.h"
 #include "LawnCommon.h"
 #include "System/Music.h"
@@ -9380,6 +9383,9 @@ int Board::GetCurrentPlantCost(SeedType theSeedType, SeedType theImitaterType)
 	{
 		aCost += CountPlantByType(theSeedType) * 50;
 	}
+#ifdef PVZ_HACK_MENU
+	aCost = Mods::ScaleCost(aCost);
+#endif
 	return aCost;
 }
 
