@@ -4,8 +4,9 @@
 #
 # Usage: scripts/make-macos-app.sh [OUTPUT_DIR] [GAME_DATA_DIR]
 #   OUTPUT_DIR     where the .app goes (default: dist)
-#   GAME_DATA_DIR  folder with main.pak and properties/ to copy into the app. Without it the app reads
-#                  ~/Library/Application Support/io.github.wszqkzqk/PvZPortable/gamedata at launch.
+#   GAME_DATA_DIR  folder with main.pak and properties/ to copy into the app. At launch the app prefers
+#                  ~/Library/Application Support/io.github.wszqkzqk/PvZPortable/gamedata-mod (extracted,
+#                  for mods), then its own copy, then .../PvZPortable/gamedata.
 set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -31,10 +32,17 @@ fi
 
 cat > "$APP/Contents/MacOS/PvZ" <<'EOF'
 #!/bin/sh
-# Game data inside the app if present, otherwise the shared gamedata folder.
+# Game data: the extracted, moddable gamedata-mod folder if it exists (scripts/extract-pak.py),
+# then the data inside the app, then the shared gamedata folder.
 DIR="$(cd "$(dirname "$0")" && pwd)"
-RES="$DIR/../Resources"
-[ -f "$RES/main.pak" ] || RES="$HOME/Library/Application Support/io.github.wszqkzqk/PvZPortable/gamedata"
+DATA="$HOME/Library/Application Support/io.github.wszqkzqk/PvZPortable"
+if [ -d "$DATA/gamedata-mod/properties" ]; then
+	RES="$DATA/gamedata-mod"
+elif [ -f "$DIR/../Resources/main.pak" ]; then
+	RES="$DIR/../Resources"
+else
+	RES="$DATA/gamedata"
+fi
 exec "$DIR/pvz-portable" -resdir="$RES" "$@"
 EOF
 chmod 755 "$APP/Contents/MacOS/PvZ"
