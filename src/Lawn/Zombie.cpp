@@ -1247,6 +1247,10 @@ void Zombie::PickRandomSpeed()
 	{
 		mVelX *= ModContent::GIANT_PAIL_SPEED;
 	}
+	if (mApp->mGameMode == GameMode::GAMEMODE_MOD_GIANTS)
+	{
+		mVelX *= ModContent::GIANTS_MODE_SPEED;
+	}
 }
 
 void Zombie::BungeeStealTarget()

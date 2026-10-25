@@ -1515,6 +1515,24 @@ void Challenge::UpdateConveyorBelt()
 		aSeedPickArray[2].mItem = SEED_GIANT_WALLNUT;
 		aSeedPickArray[2].mWeight = 15;
 	}
+	else if (mApp->mGameMode == GAMEMODE_MOD_CONVEYOR)
+	{
+		aSeedPickCount = 7;
+		aSeedPickArray[0].mItem = SEED_FIRE_PEASHOOTER;
+		aSeedPickArray[0].mWeight = 25;
+		aSeedPickArray[1].mItem = SEED_PEA_NUT;
+		aSeedPickArray[1].mWeight = 15;
+		aSeedPickArray[2].mItem = SEED_ICE_NUT;
+		aSeedPickArray[2].mWeight = 15;
+		aSeedPickArray[3].mItem = SEED_CHERRYBOMB;
+		aSeedPickArray[3].mWeight = 10;
+		aSeedPickArray[4].mItem = SEED_REPEATER;
+		aSeedPickArray[4].mWeight = 15;
+		aSeedPickArray[5].mItem = SEED_SNOWPEA;
+		aSeedPickArray[5].mWeight = 10;
+		aSeedPickArray[6].mItem = SEED_SQUASH;
+		aSeedPickArray[6].mWeight = 10;
+	}
 	else if (mApp->IsWallnutBowlingLevel())
 	{
 		aSeedPickCount = 2;
@@ -2476,6 +2494,31 @@ void Challenge::InitZombieWaves()
 		aList[ZOMBIE_TRAFFIC_CONE] = true;
 		aList[ZOMBIE_DOLPHIN_RIDER] = true;
 		aList[ZOMBIE_BALLOON] = true;
+	}
+	// Mods: zombie lists of the new modes
+	else if (aGameMode == GAMEMODE_MOD_INVASION || aGameMode == GAMEMODE_MOD_CONVEYOR)
+	{
+		aList[ZOMBIE_NORMAL] = true;
+		aList[ZOMBIE_TRAFFIC_CONE] = true;
+		aList[ZOMBIE_SPEEDY] = true;
+		aList[ZOMBIE_ICE] = true;
+		aList[ZOMBIE_GHOST] = true;
+		aList[ZOMBIE_GIANT_PAIL] = true;
+	}
+	else if (aGameMode == GAMEMODE_MOD_GHOST_NIGHT)
+	{
+		aList[ZOMBIE_NORMAL] = true;
+		aList[ZOMBIE_GHOST] = true;
+		aList[ZOMBIE_SPEEDY] = true;
+		aList[ZOMBIE_NEWSPAPER] = true;
+	}
+	else if (aGameMode == GAMEMODE_MOD_GIANTS)
+	{
+		aList[ZOMBIE_NORMAL] = true;
+		aList[ZOMBIE_TRAFFIC_CONE] = true;
+		aList[ZOMBIE_PAIL] = true;
+		aList[ZOMBIE_DOOR] = true;
+		aList[ZOMBIE_FOOTBALL] = true;
 	}
 	else
 	{

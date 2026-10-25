@@ -9,6 +9,7 @@
 #include "Lawn/Widget/TitleScreen.h"
 #include "Lawn/Widget/GameSelector.h"
 #include "Lawn/Widget/SeedChooserScreen.h"
+#include "Lawn/Widget/ChallengeScreen.h"
 #include "ModContent.h"
 #include "HackMenu.h"
 #include <format>
@@ -65,11 +66,31 @@ namespace
 			HackMenu::RequestScreenshot(std::format("{}/{}.png", aFolder, theName).c_str());
 	}
 
+	// PVZ_MOD_TEST=modes opens the Mods minigame page; =mode1..mode4 also plays that mode.
+	int TestModeNumber()
+	{
+		static const int sModeNumber = [] {
+			const char* aTest = SDL_getenv("PVZ_MOD_TEST");
+			if (SDL_strcmp(aTest, "modes") == 0)
+				return 0;
+			if (SDL_strncmp(aTest, "mode", 4) == 0)
+				return SDL_atoi(aTest + 4);
+			return -1;
+		}();
+		return sModeNumber;
+	}
+
 	void UpdateModTest(LawnApp* theApp)
 	{
 		static int sStep = 0;
 		static int sTicks = 0;
+		static int sTotalTicks = 0;
 		sTicks++;
+		sTotalTicks++;
+		// PVZ_MOD_TEST_DEBUG: a frame every 5 s with the step, to see where a test gets stuck
+		static const bool sDebugShots = SDL_getenv("PVZ_MOD_TEST_DEBUG") != nullptr;
+		if (sDebugShots && sTotalTicks % 500 == 0)
+			TestScreenshot(std::format("dbg-{:05}-step{}", sTotalTicks, sStep).c_str());
 		switch (sStep)
 		{
 		case 0:
@@ -81,7 +102,13 @@ namespace
 			}
 			break;
 		case 1:
-			if (theApp->mGameSelector && theApp->mGameScene == GameScenes::SCENE_MENU && sTicks > 100)
+			if (TestModeNumber() >= 0 && theApp->mGameSelector && theApp->mGameScene == GameScenes::SCENE_MENU && sTicks > 100)
+			{
+				theApp->mGameSelector->ButtonDepress(101);	// GameSelector_Minigame (private)
+				sStep = 10;
+				sTicks = 0;
+			}
+			else if (theApp->mGameSelector && theApp->mGameScene == GameScenes::SCENE_MENU && sTicks > 100)
 			{
 				// A click on Adventure, so the selector runs its own transition (PreNewGame here would
 				// delete the selector in the middle of its Update).
@@ -109,13 +136,51 @@ namespace
 				}
 				else
 				{
-					theApp->mSeedChooserScreen->PickRandomSeeds();
+					// Only once: calling it again while the chooser slides away restarts the "Ready, Set, Plant" intro.
+					static bool sPicked = false;
+					if (!sPicked)
+						theApp->mSeedChooserScreen->PickRandomSeeds();
+					sPicked = true;
 				}
 				sTicks = 0;
 			}
 			break;
+		case 10:
+			if (theApp->mChallengeScreen && sTicks > 60)
+			{
+				theApp->mChallengeScreen->ButtonDepress(300 + ChallengePage::CHALLENGE_PAGE_MODS);	// ChallengeScreen_Page + page
+				sStep = 11;
+				sTicks = 0;
+			}
+			break;
+		case 11:
+			if (sTicks == 60)
+				TestScreenshot("challenge-mods");
+			if (sTicks > 90 && TestModeNumber() > 0)
+			{
+				int aMode = GameMode::GAMEMODE_MOD_INVASION + TestModeNumber() - 1;
+				theApp->mChallengeScreen->ButtonDepress(200 + aMode - 1);	// ChallengeScreen_Mode + challenge index
+				sStep = 2;
+				sTicks = 0;
+			}
+			break;
 		case 3:
-			if (theApp->mBoard && theApp->mGameScene == GameScenes::SCENE_PLAYING && sTicks > 250)
+			if (TestModeNumber() > 0 && theApp->mBoard && theApp->mGameScene == GameScenes::SCENE_PLAYING && sTicks > 250)
+			{
+				// In a mod mode: two of each zombie the mode allows, no plants, to see the mode itself.
+				Board* aBoard = theApp->mBoard;
+				for (int aType = 0; aType < ZombieType::NUM_ZOMBIE_TYPES; aType++)
+				{
+					if (!aBoard->mZombieAllowed[aType])
+						continue;
+					for (int i = 0; i < 2; i++)
+						aBoard->AddZombie(static_cast<ZombieType>(aType), Zombie::ZOMBIE_WAVE_DEBUG);
+					PvzpLogLn("ModTest: mode {} allows zombie type {}", static_cast<int>(theApp->mGameMode), aType);
+				}
+				sStep = 4;
+				sTicks = 0;
+			}
+			else if (theApp->mBoard && theApp->mGameScene == GameScenes::SCENE_PLAYING && sTicks > 250)
 			{
 				Board* aBoard = theApp->mBoard;
 				for (int aRow = 0; aRow < MAX_GRID_SIZE_Y; aRow++)
@@ -145,7 +210,7 @@ namespace
 		case 4:
 			// Every 2 s: each zombie and the projectile mix, so the result can be read from the log.
 			if (sTicks == 600 || sTicks == 900)
-				TestScreenshot(std::format("board-{}", sTicks).c_str());
+				TestScreenshot(TestModeNumber() > 0 ? std::format("mode{}-{}", TestModeNumber(), sTicks).c_str() : std::format("board-{}", sTicks).c_str());
 			if (theApp->mBoard && sTicks % 200 == 0 && sTicks <= 3000)
 			{
 				for (Zombie* aZombie : theApp->mBoard->mZombies)

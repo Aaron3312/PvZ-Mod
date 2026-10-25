@@ -44,6 +44,14 @@ namespace
 			"{SHORTLINE}\n{KEYWORD}Produccion de sol:{STAT} doble\n{SHORTLINE}\n"
 			"{FLAVOR}Se pule con oro cada dia. Los demas girasoles dicen que es presumido; el dice que es ahorro." },
 
+		{ "MOD_MODES_TITLE", "Modos mod" },
+		{ "MOD_PAGE_BUTTON", "Mods" },
+		{ "MINIGAMES_PAGE_BUTTON", "Minijuegos" },
+		{ "MOD_INVASION", "Invasion mod" },
+		{ "MOD_GHOST_NIGHT", "Noche fantasma" },
+		{ "MOD_GIANTS", "Gigantes" },
+		{ "MOD_CONVEYOR", "Cinta mod" },
+
 		{ "SPEEDY_ZOMBIE", "Zombi veloz" },
 		{ "SPEEDY_ZOMBIE_DESCRIPTION_HEADER", "El Zombi veloz camina dos veces y media mas rapido que uno normal." },
 		{ "SPEEDY_ZOMBIE_DESCRIPTION",
@@ -85,8 +93,18 @@ void ModContent::InitZombieVariant(Zombie* theZombie)
 	default:
 		break;
 	}
+	if (gLawnApp->mGameMode == GameMode::GAMEMODE_MOD_GIANTS && theZombie->mZombieType != ZombieType::ZOMBIE_BOSS)
+	{
+		theZombie->mScaleZombie *= GIANTS_MODE_SCALE;
+		theZombie->mBodyHealth *= 2;
+		theZombie->mHelmHealth *= 2;
+		theZombie->mShieldHealth *= 2;
+		theZombie->mFlyingHealth *= 2;
+	}
 	theZombie->mBodyMaxHealth = theZombie->mBodyHealth;
 	theZombie->mHelmMaxHealth = theZombie->mHelmHealth;
+	theZombie->mShieldMaxHealth = theZombie->mShieldHealth;
+	theZombie->mFlyingMaxHealth = theZombie->mFlyingHealth;
 }
 
 namespace

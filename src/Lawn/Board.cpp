@@ -27,6 +27,7 @@
 #ifdef PVZ_HACK_MENU
 #include "Mods/Mods.h"
 #endif
+#include "Mods/ModContent.h"
 #include "BoardInclude.h"
 #include "LawnCommon.h"
 #include "System/Music.h"
@@ -605,7 +606,8 @@ void Board::PickZombieWaves()
 			mNumWaves = 20;
 		else if (mApp->IsStormyNightLevel() || mApp->IsLittleTroubleLevel() || mApp->IsBungeeBlitzLevel() ||
 				 aGameMode == GameMode::GAMEMODE_CHALLENGE_COLUMN || mApp->IsShovelLevel() || aGameMode == GameMode::GAMEMODE_CHALLENGE_WAR_AND_PEAS_2 ||
-				 aGameMode == GameMode::GAMEMODE_CHALLENGE_WALLNUT_BOWLING_2 || aGameMode == GameMode::GAMEMODE_CHALLENGE_POGO_PARTY)
+				 aGameMode == GameMode::GAMEMODE_CHALLENGE_WALLNUT_BOWLING_2 || aGameMode == GameMode::GAMEMODE_CHALLENGE_POGO_PARTY ||
+				 ModContent::IsModGameMode(aGameMode))
 			mNumWaves = 30;
 		else
 			mNumWaves = 40;
@@ -898,6 +900,9 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_CHALLENGE_ICE:
 	case GameMode::GAMEMODE_CHALLENGE_SHOVEL:
 	case GameMode::GAMEMODE_CHALLENGE_SQUIRREL:
+	case GameMode::GAMEMODE_MOD_INVASION:
+	case GameMode::GAMEMODE_MOD_GIANTS:
+	case GameMode::GAMEMODE_MOD_CONVEYOR:
 		mBackground = BackgroundType::BACKGROUND_1_DAY;
 		break;
 
@@ -929,6 +934,7 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_PUZZLE_I_ZOMBIE_8:
 	case GameMode::GAMEMODE_PUZZLE_I_ZOMBIE_9:
 	case GameMode::GAMEMODE_PUZZLE_I_ZOMBIE_ENDLESS:
+	case GameMode::GAMEMODE_MOD_GHOST_NIGHT:
 		mBackground = BackgroundType::BACKGROUND_2_NIGHT;
 		break;
 
@@ -8559,7 +8565,8 @@ bool Board::HasConveyorBeltSeedBank()
 		mApp->IsBungeeBlitzLevel() ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_PORTAL_COMBAT ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_COLUMN ||
-		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_INVISIGHOUL;
+		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_INVISIGHOUL ||
+		mApp->mGameMode == GameMode::GAMEMODE_MOD_CONVEYOR;
 }
 
 int Board::GetNumSeedsInBank()

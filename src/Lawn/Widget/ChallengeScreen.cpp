@@ -107,6 +107,11 @@ constinit const ChallengeDefinition gChallengeDefs[NUM_CHALLENGE_MODES] = {
 	{ .mChallengeMode = GameMode::GAMEMODE_PUZZLE_I_ZOMBIE_8, .mChallengeIconIndex = 11, .mPage = ChallengePage::CHALLENGE_PAGE_PUZZLE, .mRow = 3, .mCol = 2, .mChallengeName = "[I_ZOMBIE_8]" },
 	{ .mChallengeMode = GameMode::GAMEMODE_PUZZLE_I_ZOMBIE_9, .mChallengeIconIndex = 11, .mPage = ChallengePage::CHALLENGE_PAGE_PUZZLE, .mRow = 3, .mCol = 3, .mChallengeName = "[I_ZOMBIE_9]" },
 	{ .mChallengeMode = GameMode::GAMEMODE_PUZZLE_I_ZOMBIE_ENDLESS, .mChallengeIconIndex = 11, .mPage = ChallengePage::CHALLENGE_PAGE_PUZZLE, .mRow = 3, .mCol = 4, .mChallengeName = "[I_ZOMBIE_ENDLESS]" },
+	// Mods (src/Mods/ModContent.h): their own page, always unlocked
+	{ .mChallengeMode = GameMode::GAMEMODE_MOD_INVASION, .mChallengeIconIndex = 21, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 0, .mCol = 0, .mChallengeName = "[MOD_INVASION]" },
+	{ .mChallengeMode = GameMode::GAMEMODE_MOD_GHOST_NIGHT, .mChallengeIconIndex = 8, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 0, .mCol = 1, .mChallengeName = "[MOD_GHOST_NIGHT]" },
+	{ .mChallengeMode = GameMode::GAMEMODE_MOD_GIANTS, .mChallengeIconIndex = 12, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 0, .mCol = 2, .mChallengeName = "[MOD_GIANTS]" },
+	{ .mChallengeMode = GameMode::GAMEMODE_MOD_CONVEYOR, .mChallengeIconIndex = 4, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 0, .mCol = 3, .mChallengeName = "[MOD_CONVEYOR]" },
 	{ .mChallengeMode = GameMode::GAMEMODE_UPSELL, .mChallengeIconIndex = 10, .mPage = ChallengePage::CHALLENGE_PAGE_LIMBO, .mRow = 3, .mCol = 4, .mChallengeName = "Upsell" },
 	{ .mChallengeMode = GameMode::GAMEMODE_INTRO, .mChallengeIconIndex = 10, .mPage = ChallengePage::CHALLENGE_PAGE_LIMBO, .mRow = 2, .mCol = 3, .mChallengeName = "Intro" }
 };
@@ -145,6 +150,10 @@ ChallengeScreen::ChallengeScreen(LawnApp* theApp, ChallengePage thePage)
 		aPageButton->mDoFinger = true;
 		if (aPageIdx == CHALLENGE_PAGE_LIMBO)
 			aPageButton->mLabel = mApp->GetString("LIMBO_PAGE_BUTTON", "Limbo Page");
+		else if (aPageIdx == CHALLENGE_PAGE_MODS)
+			aPageButton->mLabel = PvzpStringTranslate("[MOD_PAGE_BUTTON]");
+		else if (aPageIdx == CHALLENGE_PAGE_CHALLENGE)
+			aPageButton->mLabel = PvzpStringTranslate("[MINIGAMES_PAGE_BUTTON]");
 		else
 			aPageButton->mLabel = PvzpReplaceNumberString("[PAGE_X]", "{PAGE}", aPageIdx);
 		aPageButton->mButtonImage = Sexy::IMAGE_BLANK;
@@ -165,7 +174,7 @@ ChallengeScreen::ChallengeScreen(LawnApp* theApp, ChallengePage thePage)
 		ButtonWidget* aChallengeButton = mChallengeButtons[aChallengeMode].get();
 		aChallengeButton->mDoFinger = true;
 		aChallengeButton->mFrameNoDraw = true;
-		if (aChlDef.mPage == CHALLENGE_PAGE_CHALLENGE || aChlDef.mPage == CHALLENGE_PAGE_LIMBO || aChlDef.mPage == CHALLENGE_PAGE_PUZZLE)
+		if (aChlDef.mPage == CHALLENGE_PAGE_CHALLENGE || aChlDef.mPage == CHALLENGE_PAGE_LIMBO || aChlDef.mPage == CHALLENGE_PAGE_PUZZLE || aChlDef.mPage == CHALLENGE_PAGE_MODS)
 			aChallengeButton->Resize(38 + aChlDef.mCol * 155, 93 + aChlDef.mRow * 119, 104, 115);
 		else
 			aChallengeButton->Resize(38 + aChlDef.mCol * 155, 125 + aChlDef.mRow * 145, 104, 115);
@@ -256,6 +265,8 @@ void ChallengeScreen::SetUnlockChallengeIndex(ChallengePage thePage, bool theIsI
 int ChallengeScreen::MoreTrophiesNeeded(int theChallengeIndex)
 {
 	const ChallengeDefinition& aDef = GetChallengeDefinition(theChallengeIndex);
+	if (aDef.mPage == CHALLENGE_PAGE_MODS)
+		return 0;
 	if (mApp->mGameMode == GAMEMODE_UPSELL && mApp->mGameScene == SCENE_LEVEL_INTRO)
 	{
 		return aDef.mChallengeMode == GAMEMODE_CHALLENGE_FINAL_BOSS ? 1 : 0;
@@ -368,6 +379,11 @@ void ChallengeScreen::UpdateButtons()
 		ButtonWidget* aPageButton = mPageButton[aPage].get();
 
 		if (mLimboPageUnlocked && aPage == CHALLENGE_PAGE_LIMBO)
+			aPageButton->mVisible = true;
+		// Mods: the Mods page is one click away from the minigames page, and back
+		if (aPage == CHALLENGE_PAGE_MODS)
+			aPageButton->mVisible = mPageIndex == CHALLENGE_PAGE_CHALLENGE || mPageIndex == CHALLENGE_PAGE_MODS;
+		else if (aPage == CHALLENGE_PAGE_CHALLENGE && mPageIndex == CHALLENGE_PAGE_MODS)
 			aPageButton->mVisible = true;
 
 		if (aPage == mPageIndex)
@@ -572,7 +588,8 @@ void ChallengeScreen::Draw(Graphics* g)
 
 	std::string aTitleString =
 		mPageIndex == CHALLENGE_PAGE_SURVIVAL ? "[PICK_AREA]" :
-		mPageIndex == CHALLENGE_PAGE_PUZZLE ? "[SCARY_POTTER]" : "[PICK_CHALLENGE]";
+		mPageIndex == CHALLENGE_PAGE_PUZZLE ? "[SCARY_POTTER]" :
+		mPageIndex == CHALLENGE_PAGE_MODS ? "[MOD_MODES_TITLE]" : "[PICK_CHALLENGE]";
 	PvzpDrawString(g, aTitleString, 400, 58, Sexy::FONT_HOUSEOFTERROR28, Color(220, 220, 220), DS_ALIGN_CENTER);
 
 	int aTrophiesGot = mApp->GetNumTrophies(mPageIndex);
@@ -659,7 +676,7 @@ void ChallengeScreen::ButtonDepress(int theId)
 	}
 
 	int aPageIndex = theId - ChallengeScreen::ChallengeScreen_Page;
-	if (aPageIndex >= 0 && aPageIndex < 4)
+	if (aPageIndex >= 0 && aPageIndex < MAX_CHALLANGE_PAGES)
 	{
 		mPageIndex = (ChallengePage)aPageIndex;
 		UpdateButtons();

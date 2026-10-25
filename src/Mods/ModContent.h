@@ -50,6 +50,14 @@ namespace ModContent
 		}
 	}
 
+	constexpr bool IsModGameMode(GameMode theGameMode)
+	{
+		return theGameMode >= GameMode::GAMEMODE_MOD_INVASION && theGameMode <= GameMode::GAMEMODE_MOD_CONVEYOR;
+	}
+
+	constexpr float GIANTS_MODE_SCALE = 1.4f;		// "Gigantes": every zombie this big, with twice the health
+	constexpr float GIANTS_MODE_SPEED = 0.8f;
+
 	constexpr float SPEEDY_ZOMBIE_SPEED = 2.5f;		// times a normal zombie's walking speed
 	constexpr float GIANT_PAIL_SPEED = 0.6f;
 	constexpr float GIANT_PAIL_SCALE = 1.5f;
