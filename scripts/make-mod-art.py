@@ -21,6 +21,7 @@ pak = import_module("extract-pak")
 # recolor: (hue 0-255, saturation factor, brightness factor)
 ICE = (142, 0.55, 1.35)
 PEA = (68, 1.0, 1.08)
+SPIKY = (191, 0.75, 1.0)
 MOD_IMAGES = {
     "IceNut_body.png": ("reanim/Wallnut_body.png", ICE),
     "IceNut_cracked1.png": ("reanim/Wallnut_cracked1.png", ICE),
@@ -28,6 +29,9 @@ MOD_IMAGES = {
     "PeaNut_body.png": ("reanim/Wallnut_body.png", PEA),
     "PeaNut_cracked1.png": ("reanim/Wallnut_cracked1.png", PEA),
     "PeaNut_cracked2.png": ("reanim/Wallnut_cracked2.png", PEA),
+    "SpikyNut_body.png": ("reanim/Wallnut_body.png", SPIKY),
+    "SpikyNut_cracked1.png": ("reanim/Wallnut_cracked1.png", SPIKY),
+    "SpikyNut_cracked2.png": ("reanim/Wallnut_cracked2.png", SPIKY),
 }
 
 

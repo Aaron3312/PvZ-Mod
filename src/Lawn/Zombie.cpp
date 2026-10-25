@@ -120,6 +120,11 @@ constinit const ZombieDefinition gZombieDefs[NUM_ZOMBIE_TYPES] = {
 	{ .mZombieType = ZOMBIE_GIANT_PAIL, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 8, .mStartingLevel = 29, .mFirstAllowedWave = 10, .mPickWeight = 800, .mZombieName = "GIANT_PAIL_ZOMBIE" },
 	{ .mZombieType = ZOMBIE_ICE, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 3, .mStartingLevel = 24, .mFirstAllowedWave = 5, .mPickWeight = 1500, .mZombieName = "ICE_ZOMBIE" },
 	{ .mZombieType = ZOMBIE_GHOST, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 3, .mStartingLevel = 27, .mFirstAllowedWave = 5, .mPickWeight = 1200, .mZombieName = "GHOST_ZOMBIE" },
+	{ .mZombieType = ZOMBIE_HEALER, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 3, .mStartingLevel = 25, .mFirstAllowedWave = 6, .mPickWeight = 1000, .mZombieName = "HEALER_ZOMBIE" },
+	{ .mZombieType = ZOMBIE_KAMIKAZE, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 3, .mStartingLevel = 26, .mFirstAllowedWave = 6, .mPickWeight = 1000, .mZombieName = "KAMIKAZE_ZOMBIE" },
+	{ .mZombieType = ZOMBIE_SPLITTER, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 3, .mStartingLevel = 23, .mFirstAllowedWave = 4, .mPickWeight = 1200, .mZombieName = "SPLITTER_ZOMBIE" },
+	{ .mZombieType = ZOMBIE_MINI, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 1, .mStartingLevel = 99, .mFirstAllowedWave = 1, .mPickWeight = 0, .mZombieName = "MINI_ZOMBIE" },
+	{ .mZombieType = ZOMBIE_HOPPER, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 2, .mStartingLevel = 21, .mFirstAllowedWave = 3, .mPickWeight = 1200, .mZombieName = "HOPPER_ZOMBIE" },
 };
 
 static ZombieType gBossZombieList[] = {
@@ -1246,6 +1251,10 @@ void Zombie::PickRandomSpeed()
 	else if (mZombieType == ZombieType::ZOMBIE_GIANT_PAIL)
 	{
 		mVelX *= ModContent::GIANT_PAIL_SPEED;
+	}
+	else if (mZombieType == ZombieType::ZOMBIE_MINI)
+	{
+		mVelX *= ModContent::MINI_SPEED;
 	}
 	if (mApp->mGameMode == GameMode::GAMEMODE_MOD_GIANTS)
 	{
@@ -4349,6 +4358,9 @@ void Zombie::Update()
 
 	if (doUpdate)
 	{
+		ModContent::UpdateZombie(this);
+		if (mDead)
+			return;
 		if (mZombiePhase == ZombiePhase::PHASE_ZOMBIE_BURNED)
 		{
 			UpdateBurn();
@@ -5737,6 +5749,12 @@ void Zombie::DrawReanim(Graphics* g, const ZombieDrawPosition& theDrawPos, int t
 		aExtraAdditiveColor = aColorOverride;
 		aEnableExtraAdditiveDraw = true;
 	}
+	else if (ModContent::IsPoisonColored(this))
+	{
+		aColorOverride = Color(200, 130, 255, aFadeAlpha);
+		aExtraAdditiveColor = Color(70, 0, 110, aFadeAlpha);
+		aEnableExtraAdditiveDraw = true;
+	}
 	else if (mZombieHeight == ZombieHeight::HEIGHT_ZOMBIQUARIUM && mBodyHealth < 100)
 	{
 		aColorOverride = Color(100, 150, 25, aFadeAlpha);
@@ -5759,6 +5777,32 @@ void Zombie::DrawReanim(Graphics* g, const ZombieDrawPosition& theDrawPos, int t
 	{
 		aColorOverride = Color(230, 240, 255, std::min(aFadeAlpha, ModContent::GHOST_ALPHA));
 		aExtraAdditiveColor = Color(40, 40, 60, std::min(aFadeAlpha, ModContent::GHOST_ALPHA));
+		aEnableExtraAdditiveDraw = true;
+	}
+	else if (mZombieType == ZombieType::ZOMBIE_HEALER)
+	{
+		aColorOverride = Color(170, 255, 170, aFadeAlpha);
+		aExtraAdditiveColor = Color(0, 70, 20, aFadeAlpha);
+		aEnableExtraAdditiveDraw = true;
+	}
+	else if (mZombieType == ZombieType::ZOMBIE_KAMIKAZE)
+	{
+		// it glows brighter and brighter, pulsing
+		int aPulse = 60 + (mZombieAge / 3) % 60;
+		aColorOverride = Color(255, 200, 120, aFadeAlpha);
+		aExtraAdditiveColor = Color(aPulse * 2, aPulse / 2, 0, aFadeAlpha);
+		aEnableExtraAdditiveDraw = true;
+	}
+	else if (mZombieType == ZombieType::ZOMBIE_SPLITTER || mZombieType == ZombieType::ZOMBIE_MINI)
+	{
+		aColorOverride = Color(255, 240, 140, aFadeAlpha);
+		aExtraAdditiveColor = Color(70, 60, 0, aFadeAlpha);
+		aEnableExtraAdditiveDraw = true;
+	}
+	else if (mZombieType == ZombieType::ZOMBIE_HOPPER)
+	{
+		aColorOverride = Color(255, 170, 255, aFadeAlpha);
+		aExtraAdditiveColor = Color(80, 0, 80, aFadeAlpha);
 		aEnableExtraAdditiveDraw = true;
 	}
 	if (mJustGotShotCounter > 0 && !IsBobsledTeamWithSled())
@@ -6414,7 +6458,7 @@ bool Zombie::CanTargetPlant(Plant* thePlant, ZombieAttackType theAttackType)
 
 	if (theAttackType == ZombieAttackType::ATTACKTYPE_DRIVE_OVER)
 	{
-		if (thePlant->mSeedType == SeedType::SEED_CHERRYBOMB || thePlant->mSeedType == SeedType::SEED_JALAPENO ||
+		if (thePlant->mSeedType == SeedType::SEED_CHERRYBOMB || thePlant->mSeedType == SeedType::SEED_ICE_CHERRY || thePlant->mSeedType == SeedType::SEED_JALAPENO ||
 			thePlant->mSeedType == SeedType::SEED_BLOVER || thePlant->mSeedType == SeedType::SEED_SQUASH)
 		{
 			return false;
@@ -7096,6 +7140,7 @@ void Zombie::EatPlant(Plant* thePlant)
 	StartEating();
 	if (thePlant->mSeedType == SeedType::SEED_JALAPENO ||
 		thePlant->mSeedType == SeedType::SEED_CHERRYBOMB ||
+		thePlant->mSeedType == SeedType::SEED_ICE_CHERRY ||
 		thePlant->mSeedType == SeedType::SEED_DOOMSHROOM ||
 		thePlant->mSeedType == SeedType::SEED_ICESHROOM ||
 		thePlant->mSeedType == SeedType::SEED_HYPNOSHROOM ||
@@ -7147,6 +7192,10 @@ void Zombie::EatPlant(Plant* thePlant)
 	if (thePlant->mSeedType == SeedType::SEED_ICE_NUT)
 	{
 		ApplyChill(false);
+	}
+	else if (thePlant->mSeedType == SeedType::SEED_SPIKY_NUT)
+	{
+		TakeDamage(ModContent::SPIKY_NUT_DAMAGE, 1U << DamageFlags::DAMAGE_DOESNT_CAUSE_FLASH);
 	}
 	if (mApp->IsIZombieLevel() && mJustGotShotCounter < -500)
 	{
@@ -7330,6 +7379,7 @@ void Zombie::DropLoot()
 		return;
 
 	AlmanacPlayerDefeatedZombie(mZombieType);
+	ModContent::OnZombieKilled(this);	// before TrySpawnLevelAward: a Splitter's minis keep the level going
 	if (mZombieType == ZombieType::ZOMBIE_YETI)
 	{
 		mBoard->mKilledYeti = true;

@@ -1517,21 +1517,27 @@ void Challenge::UpdateConveyorBelt()
 	}
 	else if (mApp->mGameMode == GAMEMODE_MOD_CONVEYOR)
 	{
-		aSeedPickCount = 7;
+		aSeedPickCount = 10;
 		aSeedPickArray[0].mItem = SEED_FIRE_PEASHOOTER;
-		aSeedPickArray[0].mWeight = 25;
+		aSeedPickArray[0].mWeight = 20;
 		aSeedPickArray[1].mItem = SEED_PEA_NUT;
-		aSeedPickArray[1].mWeight = 15;
+		aSeedPickArray[1].mWeight = 12;
 		aSeedPickArray[2].mItem = SEED_ICE_NUT;
-		aSeedPickArray[2].mWeight = 15;
+		aSeedPickArray[2].mWeight = 12;
 		aSeedPickArray[3].mItem = SEED_CHERRYBOMB;
-		aSeedPickArray[3].mWeight = 10;
+		aSeedPickArray[3].mWeight = 8;
 		aSeedPickArray[4].mItem = SEED_REPEATER;
-		aSeedPickArray[4].mWeight = 15;
-		aSeedPickArray[5].mItem = SEED_SNOWPEA;
-		aSeedPickArray[5].mWeight = 10;
+		aSeedPickArray[4].mWeight = 12;
+		aSeedPickArray[5].mItem = SEED_POISON_PEASHOOTER;
+		aSeedPickArray[5].mWeight = 15;
 		aSeedPickArray[6].mItem = SEED_SQUASH;
-		aSeedPickArray[6].mWeight = 10;
+		aSeedPickArray[6].mWeight = 8;
+		aSeedPickArray[7].mItem = SEED_SPIKY_NUT;
+		aSeedPickArray[7].mWeight = 10;
+		aSeedPickArray[8].mItem = SEED_HEAL_FLOWER;
+		aSeedPickArray[8].mWeight = 8;
+		aSeedPickArray[9].mItem = SEED_ICE_CHERRY;
+		aSeedPickArray[9].mWeight = 8;
 	}
 	else if (mApp->IsWallnutBowlingLevel())
 	{
@@ -2504,6 +2510,10 @@ void Challenge::InitZombieWaves()
 		aList[ZOMBIE_ICE] = true;
 		aList[ZOMBIE_GHOST] = true;
 		aList[ZOMBIE_GIANT_PAIL] = true;
+		aList[ZOMBIE_HEALER] = true;
+		aList[ZOMBIE_KAMIKAZE] = true;
+		aList[ZOMBIE_SPLITTER] = true;
+		aList[ZOMBIE_HOPPER] = true;
 	}
 	else if (aGameMode == GAMEMODE_MOD_GHOST_NIGHT)
 	{
@@ -2511,6 +2521,18 @@ void Challenge::InitZombieWaves()
 		aList[ZOMBIE_GHOST] = true;
 		aList[ZOMBIE_SPEEDY] = true;
 		aList[ZOMBIE_NEWSPAPER] = true;
+	}
+	else if (aGameMode == GAMEMODE_MOD_POOL_CHAOS)
+	{
+		// the second pack of zombies, with ducky tubes in the water lanes and dolphins
+		aList[ZOMBIE_NORMAL] = true;
+		aList[ZOMBIE_TRAFFIC_CONE] = true;
+		aList[ZOMBIE_DOLPHIN_RIDER] = true;
+		aList[ZOMBIE_HEALER] = true;
+		aList[ZOMBIE_KAMIKAZE] = true;
+		aList[ZOMBIE_SPLITTER] = true;
+		aList[ZOMBIE_HOPPER] = true;
+		aList[ZOMBIE_SPEEDY] = true;
 	}
 	else if (aGameMode == GAMEMODE_MOD_GIANTS)
 	{

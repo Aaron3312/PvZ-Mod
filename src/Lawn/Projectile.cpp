@@ -78,6 +78,7 @@ void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, in
 	mFrame = 0;
 	mNumFrames = 1;
 	mRow = theRow;
+	mModPoison = false;
 	mCobTargetX = 0.0f;
 	mDamageRangeFlags = 0;
 	mDead = false;
@@ -121,8 +122,15 @@ void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, in
 		break;
 	}
 	case ProjectileType::PROJECTILE_FIREBALL:
-		PVZP_ASSERT(false);
+	{
+		// Only the mod's Fire Peashooter fires these directly (Torchwood converts peas): same flame as ConvertToFireball
+		Reanimation* aFirePeaReanim = mApp->AddReanimation(0.0f, 0.0f, 0, ReanimationType::REANIM_FIRE_PEA);
+		aFirePeaReanim->SetPosition(mPosX - 25.0f, mPosY - 25.0f);
+		aFirePeaReanim->mLoopType = ReanimLoopType::REANIM_LOOP;
+		aFirePeaReanim->mAnimRate = RandRangeFloat(50.0f, 80.0f);
+		AttachReanim(mAttachmentID, aFirePeaReanim, -25.0f, -25.0f);
 		break;
+	}
 	case ProjectileType::PROJECTILE_COBBIG:
 		mWidth = IMAGE_REANIM_COBCANNON_COB->GetWidth();
 		mHeight = IMAGE_REANIM_COBCANNON_COB->GetHeight();
@@ -845,6 +853,10 @@ void Projectile::DoImpact(Zombie* theZombie)
 		unsigned int aDamageFlags = GetDamageFlags(theZombie);
 		theZombie->TakeDamage(GetProjectileDef().mDamage, aDamageFlags);
 	}
+	if (mModPoison && theZombie && !theZombie->IsDeadOrDying())
+	{
+		theZombie->mModPoisonCounter = ModContent::POISON_TICKS;
+	}
 
 	float aLastPosX = mPosX - mVelX;
 	float aLastPosY = mPosY + mPosZ - mVelY - mVelZ;
@@ -1054,6 +1066,10 @@ void Projectile::Draw(Graphics* g)
 		int aCelWidth = aImage->GetCelWidth();
 		int aCelHeight = aImage->GetCelHeight();
 		Rect aSrcRect(aCelWidth * mFrame, aCelHeight * aProjectileDef.mImageRow, aCelWidth, aCelHeight);
+		if (mModPoison)
+		{
+			aImage = FilterEffectGetImage(aImage, FilterEffect::FILTER_EFFECT_MOD_PURPLE);
+		}
 		if (FloatApproxEqual(mRotation, 0.0f) && FloatApproxEqual(aScale, 1.0f))
 		{
 			Rect aDestRect(0, 0, aCelWidth, aCelHeight);

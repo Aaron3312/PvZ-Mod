@@ -25,6 +25,7 @@
 #include "graphics/Graphics.h"
 #include "graphics/MemoryImage.h"
 #include <algorithm>
+#include <cmath>
 
 void RGB_to_HSL(float r, float g, float b, float& h, float& s, float& l)
 {
@@ -145,6 +146,37 @@ void FilterEffectDoWhite(MemoryImage* theImage)
 			*ptr++ |= 0x00FFFFFF;
 }
 
+// Moves the hues near theFromHue (0-1, within theRange) to theToHue, fading out at the edge of the range, so
+// one color of a sprite changes and the rest (eyes, outlines, other parts) stays. Grays are left alone.
+void FilterEffectDoHueMap(MemoryImage* theImage, float theFromHue, float theRange, float theToHue, float theSat, float theLum)
+{
+	auto aWrap = [](float theHue) { return theHue - std::floor(theHue + 0.5f); };	// to [-0.5, 0.5)
+	uint32_t* ptr = theImage->mBits.get();
+	for (int i = 0; i < theImage->mWidth * theImage->mHeight; i++, ptr++)
+	{
+		float b = static_cast<float>(*ptr & 255) / 255;
+		float g = static_cast<float>(*ptr >> 8 & 255) / 255;
+		float r = static_cast<float>(*ptr >> 16 & 255) / 255;
+		int a = *ptr >> 24 & 255;
+
+		float h, s, l;
+		RGB_to_HSL(r, g, b, h, s, l);
+		float aDistance = aWrap(h - theFromHue);
+		if (s < 0.08f || std::abs(aDistance) > theRange)
+			continue;
+
+		float aWeight = std::clamp((theRange - std::abs(aDistance)) / (theRange * 0.3f), 0.0f, 1.0f);
+		float aNewHue = theToHue + aDistance * 0.5f;
+		h += aWrap(aNewHue - h) * aWeight;
+		h -= std::floor(h);
+		s = std::min(1.0f, s * (1.0f + (theSat - 1.0f) * aWeight));
+		l = std::min(1.0f, l * (1.0f + (theLum - 1.0f) * aWeight));
+		HSL_to_RGB(h, s, l, r, g, b);
+
+		*ptr = a << 24 | std::clamp(static_cast<int>(r * 255), 0, 255) << 16 | std::clamp(static_cast<int>(g * 255), 0, 255) << 8 | std::clamp(static_cast<int>(b * 255), 0, 255);
+	}
+}
+
 MemoryImage* FilterEffectCreateImage(Image* theImage, FilterEffect theFilterEffect)
 {
 	MemoryImage* aImage = new MemoryImage();
@@ -166,6 +198,10 @@ MemoryImage* FilterEffectCreateImage(Image* theImage, FilterEffect theFilterEffe
 	case FilterEffect::FILTER_EFFECT_WASHED_OUT:		FilterEffectDoWashedOut(aImage);		break;
 	case FilterEffect::FILTER_EFFECT_LESS_WASHED_OUT:	FilterEffectDoLessWashedOut(aImage);	break;
 	case FilterEffect::FILTER_EFFECT_WHITE:				FilterEffectDoWhite(aImage);			break;
+	case FilterEffect::FILTER_EFFECT_MOD_PURPLE:		FilterEffectDoHueMap(aImage, 0.27f, 0.14f, 0.78f, 1.0f, 1.0f);	break;
+	case FilterEffect::FILTER_EFFECT_MOD_ICE:			FilterEffectDoHueMap(aImage, 0.0f, 0.09f, 0.55f, 0.7f, 1.25f);	break;
+	case FilterEffect::FILTER_EFFECT_MOD_PINK:			FilterEffectDoHueMap(aImage, 0.15f, 0.06f, 0.92f, 1.0f, 1.05f);	break;
+	case FilterEffect::FILTER_EFFECT_MOD_FIRE:			FilterEffectDoHueMap(aImage, 0.27f, 0.14f, 0.05f, 1.1f, 1.05f);	break;
 	case FilterEffect::NUM_FILTER_EFFECTS:
 	case FilterEffect::FILTER_EFFECT_NONE:
 		break;

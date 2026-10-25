@@ -39,6 +39,10 @@ enum FilterEffect : int32_t
 	FILTER_EFFECT_WASHED_OUT,
 	FILTER_EFFECT_LESS_WASHED_OUT,
 	FILTER_EFFECT_WHITE,
+	FILTER_EFFECT_MOD_PURPLE,	// Mods: greens turn purple (Poison Peashooter)
+	FILTER_EFFECT_MOD_ICE,		// Mods: reds turn icy blue (Ice Cherry)
+	FILTER_EFFECT_MOD_PINK,		// Mods: yellows turn pink (Healing Sunflower)
+	FILTER_EFFECT_MOD_FIRE,		// Mods: greens turn orange (Fire Peashooter)
 	NUM_FILTER_EFFECTS
 };
 
@@ -51,6 +55,7 @@ void                FilterEffectDoLumSat(MemoryImage* theImage, float theLum, fl
 void     FilterEffectDoWashedOut(MemoryImage* theImage);
 void     FilterEffectDoLessWashedOut(MemoryImage* theImage);
 void                FilterEffectDoWhite(MemoryImage* theImage);
+void                FilterEffectDoHueMap(MemoryImage* theImage, float theFromHue, float theRange, float theToHue, float theSat, float theLum);
 MemoryImage*        FilterEffectCreateImage(Image* theImage, FilterEffect theFilterEffect);
 Image*              FilterEffectGetImage(Image* theImage, FilterEffect theFilterEffect);
 

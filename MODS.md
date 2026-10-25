@@ -20,6 +20,10 @@ Están en la página **Mods** del selector de semillas: botón junto a «¡A jug
 | Hielonuez | Nuez | 100 | Aguanta como una nuez y ralentiza al zombi que la muerde |
 | Nuez tiradora | Nuez | 150 | Aguanta como una nuez y dispara guisantes |
 | Girasol dorado | Girasol | 100 | Produce dos soles cada vez |
+| Lanzaveneno | Lanzaguisantes | 150 | Morado; sus guisantes envenenan 4 s (10 de daño cada medio segundo) |
+| Nuez espinosa | Nuez | 125 | Morada; el zombi que la muerde pierde 50 de vida por segundo |
+| Girasol sanador | Girasol | 75 | Rosa; no da sol: cada 2,5 s cura 80 a las plantas del 3×3 que lo rodea |
+| Cereza de hielo | Petacereza | 125 | Azul; explota con 90 de daño y congela a los zombis de alrededor |
 
 | Zombi | Base | Desde | Qué hace |
 |---|---|---|---|
@@ -27,10 +31,31 @@ Están en la página **Mods** del selector de semillas: botón junto a «¡A jug
 | Zombi de hielo | Caracono | 3-4 | Celeste, inmune al frío y a la congelación, 1,5 veces más vida |
 | Zombi fantasma | Zombi | 3-7 | Translúcido: los disparos rectos lo atraviesan; solo le hacen daño las catapultas, el fuego en área y las explosiones |
 | Caracubo gigante | Caracubo | 3-9 | 1,5 veces más grande, el triple de vida y más lento |
+| Zombi saltacarril | Zombi | 3-1 | Rosa; cambia de fila cada 6 s, como si oliera ajo |
+| Zombi divisor | Zombi | 3-3 | Amarillo, 400 de vida; al morir se parte en dos minizombis rápidos |
+| Zombi médico | Zombi | 3-5 | Verde; cada 3 s cura 60 a los zombis cercanos (destellan en blanco) |
+| Zombi kamikaze | Zombi | 3-6 | Brilla cada vez más; al morir explota y quita 600 a las plantas de alrededor |
+
+Las habilidades al morir (divisor, kamikaze) saltan en `Zombie::DropLoot`, que el juego llama en toda muerte con botín, antes de comprobar si el nivel está ganado: así los minizombis evitan que el nivel termine. El veneno, las curaciones y los cambios de fila van en `ModContent::UpdateZombie` y `ModContent::UpdatePlant`, que se llaman una vez por tic.
+
+## Modos de juego
+
+En **Minijuegos**, botón **Mods** abajo a la derecha. Siempre desbloqueados, 30 oleadas cada uno.
+
+| Modo | Escenario | Qué tiene |
+|---|---|---|
+| Invasión mod | Día | Todos los zombis mod mezclados con los normales |
+| Noche fantasma | Noche | Fantasmas, veloces y zombis del periódico |
+| Gigantes | Día | Cada zombi 1,4 veces más grande, con el doble de vida y algo más lento |
+| Cinta mod | Día | Sin elegir semillas: la cinta trae plantas mod y algunas normales |
+| Caos en la piscina | Piscina | Los zombis de la segunda tanda, con flotadores y delfines |
 
 **Cómo están hechos:** cada uno es una variante de un original y comparte su código, a través de `ModContent::BaseSeedType` y `ModContent::BaseZombieType`. Sus valores van al final de `SeedType` y `ZombieType`, así que los originales conservan los suyos. Los nombres y textos del almanaque están en `src/Mods/ModContent.cpp`.
 
-**Sprites:** las dos nueces usan imágenes recoloreadas que genera `scripts/make-mod-art.py` a partir de tus datos del juego. No se guardan en el repo porque derivan del arte de EA. El juego las busca en `<ejecutable>/mods` o en `Contents/Resources/mods`, y `make-macos-app.sh` las genera solo. Si faltan, se usa un tinte.
+**Sprites:** hay dos maneras de recolorear.
+
+- **Nueces** (Hielonuez, Nuez tiradora, Nuez espinosa): imágenes que genera `scripts/make-mod-art.py` a partir de tus datos del juego. No se guardan en el repo porque derivan del arte de EA. El juego las busca en `<ejecutable>/mods` o en `Contents/Resources/mods`, y `make-macos-app.sh` las genera solo. Si faltan, se usa un tinte.
+- **Lanzafuego, Lanzaveneno, Girasol sanador y Cereza de hielo:** filtros que cambian un tono por otro al vuelo (`FilterEffectDoHueMap` en `src/PvzpLib/FilterEffect.cpp`, el mismo sistema que blanquea a la Imitadora). Teñir no basta: una planta verde teñida de morado solo se oscurece. Cada planta tiene su filtro en `ModContent::PlantFilter`, que se aplica a sus animaciones y al dibujo de su sobre. El guisante venenoso usa el mismo filtro morado.
 
 **Probarlo sin ratón y sin sonido:**
 
@@ -40,7 +65,8 @@ SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy PVZ_MOD_TEST=1 PVZ_MOD_TEST_SHOTS=/
 ```
 
 - `PVZ_MOD_TEST=1` entra en un nivel, planta las plantas nuevas junto a un lanzaguisantes normal y suelta tres de cada zombi nuevo.
-- Cada 2 s escribe en el log los zombis (tipo, fila, posición, velocidad, vida, frío y escala) y cuántos proyectiles hay de cada tipo.
+- Cada 2 s escribe en el log los zombis (tipo, fila, posición, velocidad, vida, frío, congelación, veneno y escala), cuántos proyectiles hay de cada tipo y cuántas plantas siguen vivas y heridas.
+- `=modes` abre la página Mods de los minijuegos y `=mode1`…`=mode5` juega ese modo y suelta dos de cada zombi que permite.
 - `=chooser` se queda en la página Mods del selector.
 - `PVZ_MOD_TEST_SHOTS` hace que el propio juego guarde capturas, así nunca se captura el escritorio.
 

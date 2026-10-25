@@ -66,7 +66,7 @@ namespace
 			HackMenu::RequestScreenshot(std::format("{}/{}.png", aFolder, theName).c_str());
 	}
 
-	// PVZ_MOD_TEST=modes opens the Mods minigame page; =mode1..mode4 also plays that mode.
+	// PVZ_MOD_TEST=modes opens the Mods minigame page; =mode1..mode5 also plays that mode.
 	int TestModeNumber()
 	{
 		static const int sModeNumber = [] {
@@ -211,12 +211,43 @@ namespace
 			// Every 2 s: each zombie and the projectile mix, so the result can be read from the log.
 			if (sTicks == 600 || sTicks == 900)
 				TestScreenshot(TestModeNumber() > 0 ? std::format("mode{}-{}", TestModeNumber(), sTicks).c_str() : std::format("board-{}", sTicks).c_str());
+			// PVZ_MOD_TEST_SAVELOAD: at 10 s, save, throw the board away and load it again (what "Continue" does),
+			// to check that the mod fields survive a saved game. The file goes next to the screenshots.
+			static const bool sSaveLoad = SDL_getenv("PVZ_MOD_TEST_SAVELOAD") != nullptr && SDL_getenv("PVZ_MOD_TEST_SHOTS") != nullptr;
+			if (sSaveLoad && sTicks == 1000 && theApp->mBoard)
+			{
+				auto aSummary = [](Board* theBoard)
+				{
+					int aPoisoned = 0, aZombieTimers = 0, aDeathDone = 0, aPlantTimers = 0, aPoisonPeas = 0;
+					for (Zombie* aZombie : theBoard->mZombies)
+					{
+						if (aZombie->mDead)
+							continue;
+						aPoisoned += aZombie->mModPoisonCounter > 0;
+						aZombieTimers += aZombie->mModTimer;
+						aDeathDone += aZombie->mModDeathDone;
+					}
+					for (Plant* aPlant : theBoard->mPlants)
+						if (!aPlant->mDead)
+							aPlantTimers += aPlant->mModTimer;
+					for (Projectile* aProjectile : theBoard->mProjectiles)
+						if (!aProjectile->mDead)
+							aPoisonPeas += aProjectile->mModPoison;
+					return std::format("poisoned {} zombie timers {} death done {} plant timers {} poison peas {}", aPoisoned, aZombieTimers, aDeathDone, aPlantTimers, aPoisonPeas);
+				};
+				std::string aPath = std::format("{}/modtest-save.v4", SDL_getenv("PVZ_MOD_TEST_SHOTS"));
+				PvzpLogLn("ModTest: before save: {}", aSummary(theApp->mBoard));
+				theApp->mBoard->SaveGame(aPath);
+				theApp->MakeNewBoard();
+				bool aLoaded = theApp->mBoard->LoadGame(aPath);
+				PvzpLogLn("ModTest: loaded {}: {}", aLoaded, aSummary(theApp->mBoard));
+			}
 			if (theApp->mBoard && sTicks % 200 == 0 && sTicks <= 3000)
 			{
 				for (Zombie* aZombie : theApp->mBoard->mZombies)
 				{
 					if (!aZombie->mDead)
-						PvzpLogLn("ModTest: t={} zombie type {} row {} x {:.0f} velX {:.2f} body {} helm {} chill {} scale {:.1f}", sTicks, static_cast<int>(aZombie->mZombieType), aZombie->mRow, aZombie->mPosX, aZombie->mVelX, aZombie->mBodyHealth, aZombie->mHelmHealth, aZombie->mChilledCounter, aZombie->mScaleZombie);
+						PvzpLogLn("ModTest: t={} zombie type {} row {} x {:.0f} velX {:.2f} body {} helm {} chill {} frozen {} poison {} scale {:.1f}", sTicks, static_cast<int>(aZombie->mZombieType), aZombie->mRow, aZombie->mPosX, aZombie->mVelX, aZombie->mBodyHealth, aZombie->mHelmHealth, aZombie->mChilledCounter, aZombie->mIceTrapCounter, aZombie->mModPoisonCounter, aZombie->mScaleZombie);
 				}
 				int aCount[16] = {};
 				for (Projectile* aProjectile : theApp->mBoard->mProjectiles)
@@ -224,7 +255,17 @@ namespace
 					if (!aProjectile->mDead && aProjectile->mProjectileType >= 0 && aProjectile->mProjectileType < 16)
 						aCount[aProjectile->mProjectileType]++;
 				}
-				PvzpLogLn("ModTest: t={} projectiles pea {} fireball {}", sTicks, aCount[ProjectileType::PROJECTILE_PEA], aCount[ProjectileType::PROJECTILE_FIREBALL]);
+				int aPlants = 0;
+				int aHurtPlants = 0;
+				for (Plant* aPlant : theApp->mBoard->mPlants)
+				{
+					if (aPlant->mDead)
+						continue;
+					aPlants++;
+					if (aPlant->mPlantHealth < aPlant->mPlantMaxHealth)
+						aHurtPlants++;
+				}
+				PvzpLogLn("ModTest: t={} projectiles pea {} fireball {} plants {} hurt {}", sTicks, aCount[ProjectileType::PROJECTILE_PEA], aCount[ProjectileType::PROJECTILE_FIREBALL], aPlants, aHurtPlants);
 			}
 			break;
 		default:

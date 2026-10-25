@@ -81,6 +81,11 @@ namespace
 		{ ZombieType::ZOMBIE_GIANT_PAIL, "Caracubo gigante (mod)" },
 		{ ZombieType::ZOMBIE_ICE, "Zombi de hielo (mod)" },
 		{ ZombieType::ZOMBIE_GHOST, "Zombi fantasma (mod)" },
+		{ ZombieType::ZOMBIE_HEALER, "Zombi medico (mod)" },
+		{ ZombieType::ZOMBIE_KAMIKAZE, "Zombi kamikaze (mod)" },
+		{ ZombieType::ZOMBIE_SPLITTER, "Zombi divisor (mod)" },
+		{ ZombieType::ZOMBIE_MINI, "Minizombi (mod)" },
+		{ ZombieType::ZOMBIE_HOPPER, "Zombi saltacarril (mod)" },
 	};
 
 	bool IsToggleKey(const SDL_Event& theEvent)

@@ -392,6 +392,13 @@ public:
 	void                            SetupReanimForLostArm(unsigned int theDamageFlags);
 	bool                            IsSquashTarget(Plant* theExcept);
 	static bool			IsZombotany(ZombieType theZombieType);
+
+public:
+	// Mods (src/Mods/ModContent.cpp), set in ModContent::InitZombieVariant
+	int32_t                         mModPoisonCounter = 0;	// ticks of poison left
+	int32_t                         mModTimer = 0;			// ticks since it appeared, for periodic abilities
+	bool                            mModDeathDone = false;	// its death ability (split, explode) already ran
+
 };
 
 class ZombieDefinition

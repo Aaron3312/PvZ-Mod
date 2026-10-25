@@ -946,6 +946,7 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_CHALLENGE_SPEED:
 	case GameMode::GAMEMODE_CHALLENGE_LAST_STAND:
 	case GameMode::GAMEMODE_CHALLENGE_WAR_AND_PEAS_2:
+	case GameMode::GAMEMODE_MOD_POOL_CHAOS:
 	case GameMode::GAMEMODE_UPSELL:
 	case GameMode::GAMEMODE_INTRO:
 		mBackground = BackgroundType::BACKGROUND_3_POOL;
@@ -9508,5 +9509,6 @@ int Board::NumberZombiesInWave(int theWaveIndex)
 
 bool Board::IsZombieTypeSpawnedOnly(ZombieType theZombieType)
 {
-	return (theZombieType == ZombieType::ZOMBIE_BACKUP_DANCER || theZombieType == ZombieType::ZOMBIE_BOBSLED || theZombieType == ZombieType::ZOMBIE_IMP);
+	return (theZombieType == ZombieType::ZOMBIE_BACKUP_DANCER || theZombieType == ZombieType::ZOMBIE_BOBSLED || theZombieType == ZombieType::ZOMBIE_IMP ||
+		theZombieType == ZombieType::ZOMBIE_MINI);
 }

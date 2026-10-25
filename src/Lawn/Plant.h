@@ -316,6 +316,11 @@ public:
 	void                    GoldMagnetFindTargets();
 	bool                    IsAGoldMagnetAboutToSuck();
 	bool                    DrawMagnetItemsOnTop();
+
+public:
+	// Mods (src/Mods/ModContent.cpp), set in Plant::PlantInitialize
+	int32_t                 mModTimer = 0;
+
 };
 
 float                       PlantDrawHeightOffset(Board* theBoard, Plant* thePlant, SeedType theSeedType, int theCol, int theRow);

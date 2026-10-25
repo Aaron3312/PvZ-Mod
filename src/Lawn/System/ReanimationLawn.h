@@ -24,6 +24,7 @@
 
 #include "../../ConstEnums.h"
 #include "../../PvzpLib/PvzpList.h"
+#include "../../PvzpLib/FilterEffect.h"
 #include <array>
 #include <memory>
 namespace Sexy
@@ -52,6 +53,7 @@ public:
 	std::array<std::unique_ptr<MemoryImage>, LawnMowerType::NUM_MOWER_TYPES> mLawnMowers;
 	std::array<std::unique_ptr<MemoryImage>, ZombieType::NUM_CACHED_ZOMBIE_TYPES> mZombieImages;
 	LawnApp*                mApp;
+	FilterEffect            mModFilter = FilterEffect::FILTER_EFFECT_NONE;	// Mods: recolor for the plant MakeCachedPlantFrame is drawing
 
 public:
 	~ReanimatorCache();

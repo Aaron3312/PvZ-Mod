@@ -88,6 +88,7 @@ void ReanimatorCache::DrawReanimatorFrame(Graphics* g, float thePosX, float theP
 	{
 		aReanim.SetImageOverride(theOverrideTrack, theOverrideImage);
 	}
+	aReanim.mFilterEffect = mModFilter;
 
 	if (theTrackName != nullptr && aReanim.TrackExists(theTrackName))
 	{
@@ -219,6 +220,7 @@ std::unique_ptr<MemoryImage> ReanimatorCache::MakeCachedPlantFrame(SeedType theS
 
 	const PlantDefinition& aPlantDef = GetPlantDefinition(theSeedType);
 	//PVZP_ASSERT(aPlantDef.mReanimationType != ReanimationType::REANIM_NONE);
+	mModFilter = ModContent::PlantFilter(theSeedType);	// DrawReanimatorFrame applies it; reset below
 
 	if (theSeedType == SeedType::SEED_POTATOMINE)
 	{
@@ -257,18 +259,17 @@ std::unique_ptr<MemoryImage> ReanimatorCache::MakeCachedPlantFrame(SeedType theS
 			aMemoryGraphics.SetDrawMode(Graphics::DRAWMODE_NORMAL);
 		}
 	}
-	else if (theSeedType == SeedType::SEED_FIRE_PEASHOOTER)
+	else if (theSeedType == SeedType::SEED_SPIKY_NUT)
 	{
 		aMemoryGraphics.SetColorizeImages(true);
-		aMemoryGraphics.SetColor(Color(255, 150, 90));
+		aMemoryGraphics.SetColor(Color(225, 175, 255));
 		DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_idle", theDrawVariation);
-		DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_head_idle", theDrawVariation);
 	}
 	else
 	{
 		DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_idle", theDrawVariation);
 
-		if (theSeedType == SeedType::SEED_PEASHOOTER || theSeedType == SeedType::SEED_SNOWPEA || theSeedType == SeedType::SEED_REPEATER ||
+		if (ModContent::BaseSeedType(theSeedType) == SeedType::SEED_PEASHOOTER || theSeedType == SeedType::SEED_SNOWPEA || theSeedType == SeedType::SEED_REPEATER ||
 			theSeedType == SeedType::SEED_LEFTPEATER || theSeedType == SeedType::SEED_GATLINGPEA)
 		{
 			DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_head_idle", theDrawVariation);
@@ -286,6 +287,7 @@ std::unique_ptr<MemoryImage> ReanimatorCache::MakeCachedPlantFrame(SeedType theS
 		}
 	}
 
+	mModFilter = FilterEffect::FILTER_EFFECT_NONE;
 	return aMemoryImage;
 }
 

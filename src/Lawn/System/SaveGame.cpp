@@ -544,6 +544,7 @@ static void SyncGameObjectPortable(PortableSaveContext& theContext, GameObject& 
 }
 
 static constexpr const uint32_t PORTABLE_FIELD_TAIL = 100U;
+static constexpr const uint32_t PORTABLE_FIELD_MOD = 101U;	// Mods: the fields src/Mods added; older readers skip it
 
 template <typename TEnum>
 static void SyncEnum32(PortableSaveContext& theContext, TEnum& theValue)
@@ -1457,6 +1458,24 @@ static void SyncDataArrayPortableTLV(PortableSaveContext& theContext, DataArray<
 	}
 }
 
+// Mods: poison, ability timers and the death flag (src/Mods/ModContent.cpp)
+static void SyncModFieldsPortable(PortableSaveContext& theContext, Zombie& theZombie)
+{
+	theContext.SyncInt32(theZombie.mModPoisonCounter);
+	theContext.SyncInt32(theZombie.mModTimer);
+	theContext.SyncBool(theZombie.mModDeathDone);
+}
+
+static void SyncModFieldsPortable(PortableSaveContext& theContext, Plant& thePlant)
+{
+	theContext.SyncInt32(thePlant.mModTimer);
+}
+
+static void SyncModFieldsPortable(PortableSaveContext& theContext, Projectile& theProjectile)
+{
+	theContext.SyncBool(theProjectile.mModPoison);
+}
+
 // Syncs a DataArray of entities: GameObject field (1U) only when T derives from GameObject, plus the tail field.
 template <typename T, typename TTailSync>
 static void SyncDataArrayObjectsTLV(PortableSaveContext& theContext, DataArray<T>& theDataArray, TTailSync theTailSync)
@@ -1467,6 +1486,8 @@ static void SyncDataArrayObjectsTLV(PortableSaveContext& theContext, DataArray<T
 			if constexpr (std::is_base_of_v<GameObject, T>)
 				WriteGameObjectField(aOut, 1U, anItem);
 			AppendFieldWithSync(aOut, PORTABLE_FIELD_TAIL, [&](PortableSaveContext& c){ theTailSync(c, anItem); });
+			if constexpr (std::is_same_v<T, Zombie> || std::is_same_v<T, Plant> || std::is_same_v<T, Projectile>)
+				AppendFieldWithSync(aOut, PORTABLE_FIELD_MOD, [&](PortableSaveContext& c){ SyncModFieldsPortable(c, anItem); });
 		},
 		[&](uint32_t aFieldId, const uint8_t* aData, size_t aSize, T& anItem)
 		{
@@ -1478,6 +1499,10 @@ static void SyncDataArrayObjectsTLV(PortableSaveContext& theContext, DataArray<T
 				break;
 			case PORTABLE_FIELD_TAIL:
 				ApplyFieldWithSync(aData, aSize, [&](PortableSaveContext& c){ theTailSync(c, anItem); });
+				break;
+			case PORTABLE_FIELD_MOD:
+				if constexpr (std::is_same_v<T, Zombie> || std::is_same_v<T, Plant> || std::is_same_v<T, Projectile>)
+					ApplyFieldWithSync(aData, aSize, [&](PortableSaveContext& c){ SyncModFieldsPortable(c, anItem); });
 				break;
 			default: break;
 			}

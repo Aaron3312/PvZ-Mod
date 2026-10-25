@@ -103,6 +103,11 @@ public:
 	bool                    IsZombieHitBySplash(Zombie* theZombie);
 	bool                    PeaAboutToHitTorchwood();
 
+
+public:
+	// Mods: fired by the Poison Peashooter, poisons the zombie it hits
+	bool                    mModPoison = false;
+
 };
 
 #endif
