@@ -31,7 +31,7 @@ Están en la página **Mods** del selector de semillas: botón junto a «¡A jug
 | Zombi de hielo | Caracono | 3-4 | Celeste, inmune al frío y a la congelación, 1,5 veces más vida |
 | Zombi fantasma | Zombi | 3-7 | Translúcido: los disparos rectos lo atraviesan; solo le hacen daño las catapultas, el fuego en área y las explosiones |
 | Caracubo gigante | Caracubo | 3-9 | 1,5 veces más grande, el triple de vida y más lento |
-| Zombi saltacarril | Zombi | 3-1 | Rosa; cambia de fila cada 6 s, como si oliera ajo |
+| Zombi saltacarril | Zombi | 3-1 | Rosa; mientras camina cambia de fila cada 6 s, como si oliera ajo |
 | Zombi divisor | Zombi | 3-3 | Amarillo, 400 de vida; al morir se parte en dos minizombis rápidos |
 | Zombi médico | Zombi | 3-5 | Verde; cada 3 s cura 60 a los zombis cercanos (destellan en blanco) |
 | Zombi kamikaze | Zombi | 3-6 | Brilla cada vez más; al morir explota y quita 600 a las plantas de alrededor |
