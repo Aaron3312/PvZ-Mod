@@ -10,6 +10,40 @@ En el juego, la tecla a la izquierda del **1** (`º` en el teclado español, `` 
 
 En código: los ajustes están en `src/Mods/Mods.{h,cpp}` y el menú en `src/Mods/HackMenu.cpp` (Dear ImGui v1.93.0, en `third_party/imgui`). Los enganches con el juego son de una o dos líneas, dentro de `#ifdef PVZ_HACK_MENU`. Para desactivar todo: `-DPVZ_HACK_MENU=OFF`.
 
+## Plantas y zombis nuevos (rama `feat/mod-content`)
+
+Están en la página **Mods** del selector de semillas: botón junto a «¡A jugar!». Se desbloquean con la segunda aventura y fuera de la aventura están siempre.
+
+| Planta | Base | Sol | Qué hace |
+|---|---|---|---|
+| Lanzafuego | Lanzaguisantes | 175 | Dispara bolas de fuego (40 de daño, en área) |
+| Hielonuez | Nuez | 100 | Aguanta como una nuez y ralentiza al zombi que la muerde |
+| Nuez tiradora | Nuez | 150 | Aguanta como una nuez y dispara guisantes |
+| Girasol dorado | Girasol | 100 | Produce dos soles cada vez |
+
+| Zombi | Base | Desde | Qué hace |
+|---|---|---|---|
+| Zombi veloz | Zombi | 3-2 | Rojo, camina 2,5 veces más rápido |
+| Zombi de hielo | Caracono | 3-4 | Celeste, inmune al frío y a la congelación, 1,5 veces más vida |
+| Zombi fantasma | Zombi | 3-7 | Translúcido: los disparos rectos lo atraviesan; solo le hacen daño las catapultas, el fuego en área y las explosiones |
+| Caracubo gigante | Caracubo | 3-9 | 1,5 veces más grande, el triple de vida y más lento |
+
+**Cómo están hechos:** cada uno es una variante de un original y comparte su código, a través de `ModContent::BaseSeedType` y `ModContent::BaseZombieType`. Sus valores van al final de `SeedType` y `ZombieType`, así que los originales conservan los suyos. Los nombres y textos del almanaque están en `src/Mods/ModContent.cpp`.
+
+**Sprites:** las dos nueces usan imágenes recoloreadas que genera `scripts/make-mod-art.py` a partir de tus datos del juego. No se guardan en el repo porque derivan del arte de EA. El juego las busca en `<ejecutable>/mods` o en `Contents/Resources/mods`, y `make-macos-app.sh` las genera solo. Si faltan, se usa un tinte.
+
+**Probarlo sin ratón y sin sonido:**
+
+```sh
+cp -R ~/Library/Application\ Support/io.github.wszqkzqk/PvZPortable/userdata /tmp/pvz-test/   # copia: no toques el guardado real
+SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy PVZ_MOD_TEST=1 PVZ_MOD_TEST_SHOTS=/tmp/shots ./build/pvz-portable -resdir=... -savedir=/tmp/pvz-test
+```
+
+- `PVZ_MOD_TEST=1` entra en un nivel, planta las plantas nuevas junto a un lanzaguisantes normal y suelta tres de cada zombi nuevo.
+- Cada 2 s escribe en el log los zombis (tipo, fila, posición, velocidad, vida, frío y escala) y cuántos proyectiles hay de cada tipo.
+- `=chooser` se queda en la página Mods del selector.
+- `PVZ_MOD_TEST_SHOTS` hace que el propio juego guarde capturas, así nunca se captura el escritorio.
+
 ## Gráficos, sonidos y textos
 
 ```sh

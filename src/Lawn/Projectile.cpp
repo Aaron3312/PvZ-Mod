@@ -33,6 +33,7 @@
 #include "../PvzpLib/Attachment.h"
 #include "Widget/AchievementsScreen.h"
 #include <algorithm>
+#include "Mods/ModContent.h"
 
 constinit const ProjectileDefinition gProjectileDefinition[] = {
 	{ .mProjectileType = ProjectileType::PROJECTILE_PEA, .mImageRow = 0, .mDamage = 20 },
@@ -242,6 +243,12 @@ Zombie* Projectile::FindCollisionTarget()
 			}
 
 			if (mProjectileType == ProjectileType::PROJECTILE_STAR && mProjectileAge < 25 && mVelX >= 0.0f && aZombie->mZombieType == ZombieType::ZOMBIE_DIGGER)
+			{
+				continue;
+			}
+
+			// Mods: only lobbed shots (catapults) can hit the ghost zombie
+			if (aZombie->mZombieType == ZombieType::ZOMBIE_GHOST && mMotionType != ProjectileMotion::MOTION_LOBBED)
 			{
 				continue;
 			}

@@ -117,6 +117,9 @@ constinit const ZombieDefinition gZombieDefs[NUM_ZOMBIE_TYPES] = {
 	{ .mZombieType = ZOMBIE_REDEYE_GARGANTUAR, .mReanimationType = REANIM_GARGANTUAR, .mZombieValue = 10, .mStartingLevel = 48, .mFirstAllowedWave = 15, .mPickWeight = 6000, .mZombieName = "REDEYED_GARGANTUAR" },
 	// Mods (src/Mods/ModContent.h)
 	{ .mZombieType = ZOMBIE_SPEEDY, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 2, .mStartingLevel = 22, .mFirstAllowedWave = 3, .mPickWeight = 1500, .mZombieName = "SPEEDY_ZOMBIE" },
+	{ .mZombieType = ZOMBIE_GIANT_PAIL, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 8, .mStartingLevel = 29, .mFirstAllowedWave = 10, .mPickWeight = 800, .mZombieName = "GIANT_PAIL_ZOMBIE" },
+	{ .mZombieType = ZOMBIE_ICE, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 3, .mStartingLevel = 24, .mFirstAllowedWave = 5, .mPickWeight = 1500, .mZombieName = "ICE_ZOMBIE" },
+	{ .mZombieType = ZOMBIE_GHOST, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 3, .mStartingLevel = 27, .mFirstAllowedWave = 5, .mPickWeight = 1200, .mZombieName = "GHOST_ZOMBIE" },
 };
 
 static ZombieType gBossZombieList[] = {
@@ -251,7 +254,7 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 		LoadReanim(aZombieDef.mReanimationType);
 	}
 
-	switch (theType)
+	switch (ModContent::BaseZombieType(theType))
 	{
 	case ZombieType::ZOMBIE_NORMAL:
 	case ZombieType::ZOMBIE_SPEEDY:
@@ -894,6 +897,7 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 	mHelmMaxHealth = mHelmHealth;
 	mShieldMaxHealth = mShieldHealth;
 	mFlyingMaxHealth = mFlyingHealth;
+	ModContent::InitZombieVariant(this);
 	mDead = false;
 	mX = static_cast<int>(mPosX);
 	mY = static_cast<int>(mPosY);
@@ -945,12 +949,12 @@ void Zombie::SetupReanimLayers(Reanimation* aReanim, ZombieType theZombieType)
 	aReanim->AssignRenderGroupToPrefix("Zombie_mustache", RENDER_GROUP_HIDDEN);
 	SetupDoorArms(aReanim, false);
 
-	if (theZombieType == ZombieType::ZOMBIE_TRAFFIC_CONE)
+	if (ModContent::BaseZombieType(theZombieType) == ZombieType::ZOMBIE_TRAFFIC_CONE)
 	{
 		aReanim->AssignRenderGroupToPrefix("anim_cone", RENDER_GROUP_NORMAL);
 		aReanim->AssignRenderGroupToPrefix("anim_hair", RENDER_GROUP_HIDDEN);
 	}
-	else if (theZombieType == ZombieType::ZOMBIE_PAIL)
+	else if (ModContent::BaseZombieType(theZombieType) == ZombieType::ZOMBIE_PAIL)
 	{
 		aReanim->AssignRenderGroupToPrefix("anim_bucket", RENDER_GROUP_NORMAL);
 		aReanim->AssignRenderGroupToPrefix("anim_hair", RENDER_GROUP_HIDDEN);
@@ -1238,6 +1242,10 @@ void Zombie::PickRandomSpeed()
 	if (mZombieType == ZombieType::ZOMBIE_SPEEDY)
 	{
 		mVelX *= ModContent::SPEEDY_ZOMBIE_SPEED;
+	}
+	else if (mZombieType == ZombieType::ZOMBIE_GIANT_PAIL)
+	{
+		mVelX *= ModContent::GIANT_PAIL_SPEED;
 	}
 }
 
@@ -4705,10 +4713,11 @@ bool Zombie::HasYuckyFaceImage()
 	if (mBoard->mFutureMode)
 		return false;
 
+	const ZombieType aZombieType = ModContent::BaseZombieType(mZombieType);
 	return
-		mZombieType == ZombieType::ZOMBIE_NORMAL ||
-		mZombieType == ZombieType::ZOMBIE_TRAFFIC_CONE ||
-		mZombieType == ZombieType::ZOMBIE_PAIL ||
+		aZombieType == ZombieType::ZOMBIE_NORMAL ||
+		aZombieType == ZombieType::ZOMBIE_TRAFFIC_CONE ||
+		aZombieType == ZombieType::ZOMBIE_PAIL ||
 		mZombieType == ZombieType::ZOMBIE_FLAG ||
 		mZombieType == ZombieType::ZOMBIE_DOOR ||
 		mZombieType == ZombieType::ZOMBIE_DUCKY_TUBE ||
@@ -4868,7 +4877,7 @@ void Zombie::AnimateChewSound()
 		}
 		else
 		{
-			if (aPlant->mSeedType == SeedType::SEED_WALLNUT || aPlant->mSeedType == SeedType::SEED_TALLNUT || aPlant->mSeedType == SeedType::SEED_PUMPKINSHELL)
+			if (ModContent::BaseSeedType(aPlant->mSeedType) == SeedType::SEED_WALLNUT || aPlant->mSeedType == SeedType::SEED_TALLNUT || aPlant->mSeedType == SeedType::SEED_PUMPKINSHELL)
 			{
 				mApp->PlayFoley(FoleyType::FOLEY_CHOMP_SOFT);
 			}
@@ -4909,7 +4918,7 @@ void Zombie::AnimateChewEffect()
 	Plant* aPlant = FindPlantTarget(ZombieAttackType::ATTACKTYPE_CHEW);
 	if (aPlant)
 	{
-		if (aPlant->mSeedType == SeedType::SEED_WALLNUT || aPlant->mSeedType == SeedType::SEED_TALLNUT)
+		if (ModContent::BaseSeedType(aPlant->mSeedType) == SeedType::SEED_WALLNUT || aPlant->mSeedType == SeedType::SEED_TALLNUT)
 		{
 			int aRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PROJECTILE, mRow, 0);
 			ZombieDrawPosition aDrawPos;
@@ -5036,7 +5045,7 @@ void Zombie::Animate()
 /*
 void Zombie::DrawZombie(Graphics* g, const ZombieDrawPosition& theDrawPos)
 {
-    switch (mZombieType)
+    switch (ModContent::BaseZombieType(mZombieType))
     {
     case ZombieType::ZOMBIE_NORMAL:
     case ZombieType::ZOMBIE_FLAG:
@@ -5736,6 +5745,18 @@ void Zombie::DrawReanim(Graphics* g, const ZombieDrawPosition& theDrawPos, int t
 		aExtraAdditiveColor = Color(120, 0, 0, aFadeAlpha);
 		aEnableExtraAdditiveDraw = true;
 	}
+	else if (mZombieType == ZombieType::ZOMBIE_ICE)
+	{
+		aColorOverride = Color(170, 225, 255, aFadeAlpha);
+		aExtraAdditiveColor = Color(0, 50, 90, aFadeAlpha);
+		aEnableExtraAdditiveDraw = true;
+	}
+	else if (mZombieType == ZombieType::ZOMBIE_GHOST)
+	{
+		aColorOverride = Color(230, 240, 255, std::min(aFadeAlpha, ModContent::GHOST_ALPHA));
+		aExtraAdditiveColor = Color(40, 40, 60, std::min(aFadeAlpha, ModContent::GHOST_ALPHA));
+		aEnableExtraAdditiveDraw = true;
+	}
 	if (mJustGotShotCounter > 0 && !IsBobsledTeamWithSled())
 	{
 		int aGrayness = mJustGotShotCounter * 10;
@@ -6403,7 +6424,7 @@ bool Zombie::CanTargetPlant(Plant* thePlant, ZombieAttackType theAttackType)
 	if (mZombiePhase == ZombiePhase::PHASE_LADDER_CARRYING || mZombiePhase == ZombiePhase::PHASE_LADDER_PLACING)
 	{
 		bool aPlaceLadder = false;
-		if (thePlant->mSeedType == SeedType::SEED_WALLNUT || thePlant->mSeedType == SeedType::SEED_TALLNUT || thePlant->mSeedType == SeedType::SEED_PUMPKINSHELL)
+		if (ModContent::BaseSeedType(thePlant->mSeedType) == SeedType::SEED_WALLNUT || thePlant->mSeedType == SeedType::SEED_TALLNUT || thePlant->mSeedType == SeedType::SEED_PUMPKINSHELL)
 		{
 			aPlaceLadder = true;
 		}
@@ -6784,7 +6805,7 @@ void Zombie::StartWalkAnim(int theBlendTime)
 	{
 		PlayZombieReanim("anim_swim", ReanimLoopType::REANIM_LOOP, theBlendTime, 0.0f);
 	}
-	else if ((mZombieType == ZombieType::ZOMBIE_NORMAL || mZombieType == ZombieType::ZOMBIE_TRAFFIC_CONE || mZombieType == ZombieType::ZOMBIE_PAIL) && mBoard->mDanceMode)
+	else if ((ModContent::BaseZombieType(mZombieType) == ZombieType::ZOMBIE_NORMAL || ModContent::BaseZombieType(mZombieType) == ZombieType::ZOMBIE_TRAFFIC_CONE || ModContent::BaseZombieType(mZombieType) == ZombieType::ZOMBIE_PAIL) && mBoard->mDanceMode)
 	{
 		PlayZombieReanim("anim_dance", ReanimLoopType::REANIM_LOOP, theBlendTime, 0.0f);
 	}
@@ -7119,9 +7140,13 @@ void Zombie::EatPlant(Plant* thePlant)
 
 	thePlant->mPlantHealth -= DAMAGE_PER_EAT;
 	thePlant->mRecentlyEatenCountdown = 50;
+	if (thePlant->mSeedType == SeedType::SEED_ICE_NUT)
+	{
+		ApplyChill(false);
+	}
 	if (mApp->IsIZombieLevel() && mJustGotShotCounter < -500)
 	{
-		if (thePlant->mSeedType == SeedType::SEED_WALLNUT || thePlant->mSeedType == SeedType::SEED_TALLNUT || thePlant->mSeedType == SeedType::SEED_PUMPKINSHELL)
+		if (ModContent::BaseSeedType(thePlant->mSeedType) == SeedType::SEED_WALLNUT || thePlant->mSeedType == SeedType::SEED_TALLNUT || thePlant->mSeedType == SeedType::SEED_PUMPKINSHELL)
 		{
 			thePlant->mPlantHealth -= DAMAGE_PER_EAT;
 		}
@@ -8055,7 +8080,7 @@ Zombie::~Zombie()
 
 bool Zombie::CanBeChilled()
 {
-	if (mZombieType == ZombieType::ZOMBIE_ZAMBONI || IsBobsledTeamWithSled())
+	if (mZombieType == ZombieType::ZOMBIE_ZAMBONI || mZombieType == ZombieType::ZOMBIE_ICE || IsBobsledTeamWithSled())
 		return false;
 
 	if (IsDeadOrDying())
@@ -8235,11 +8260,11 @@ void Zombie::RiseFromGrave(int theCol, int theRow)
 		PvzpParticleSystem* aParticle = mApp->AddPvzpParticle(0.0f, 0.0f, 0, ParticleEffect::PARTICLE_ZOMBIE_SEAWEED);
 		OverrideParticleScale(aParticle);
 
-		if (mZombieType == ZombieType::ZOMBIE_TRAFFIC_CONE && aParticle)
+		if (ModContent::BaseZombieType(mZombieType) == ZombieType::ZOMBIE_TRAFFIC_CONE && aParticle)
 		{
 			aBodyReanim->AttachParticleToTrack("anim_cone", aParticle, 37.0f, 20.0f);
 		}
-		else if (mZombieType == ZombieType::ZOMBIE_PAIL && aParticle)
+		else if (ModContent::BaseZombieType(mZombieType) == ZombieType::ZOMBIE_PAIL && aParticle)
 		{
 			aBodyReanim->AttachParticleToTrack("anim_bucket", aParticle, 37.0f, 20.0f);
 		}
@@ -9118,7 +9143,7 @@ void Zombie::UpdateDeath()
 	if (!mInPool)
 	{
 		float aFallTime;
-		switch (mZombieType)
+		switch (ModContent::BaseZombieType(mZombieType))
 		{
 		case ZombieType::ZOMBIE_SNORKEL:
 		case ZombieType::ZOMBIE_ZAMBONI:
@@ -10714,7 +10739,8 @@ void Zombie::EnableDance()
 	if (ZombieNotWalking() || IsDeadOrDying())
 		return;
 
-	if (mZombieType == ZombieType::ZOMBIE_NORMAL || mZombieType == ZombieType::ZOMBIE_TRAFFIC_CONE || mZombieType == ZombieType::ZOMBIE_PAIL)
+	const ZombieType aBaseType = ModContent::BaseZombieType(mZombieType);
+	if (aBaseType == ZombieType::ZOMBIE_NORMAL || aBaseType == ZombieType::ZOMBIE_TRAFFIC_CONE || aBaseType == ZombieType::ZOMBIE_PAIL)
 	{
 		StartWalkAnim(0);
 	}

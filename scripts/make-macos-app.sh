@@ -30,6 +30,11 @@ if [ -n "$DATA_DIR" ]; then
 	cp -R "$DATA_DIR/properties" "$APP/Contents/Resources/"
 fi
 
+# Mod sprites are recolored from the player's own data, never committed (scripts/make-mod-art.py).
+ART_SRC="${DATA_DIR:-$HOME/Library/Application Support/io.github.wszqkzqk/PvZPortable/gamedata}"
+python3 -I "$ROOT/scripts/make-mod-art.py" "$ART_SRC" "$APP/Contents/Resources/mods" ||
+	echo "warning: no mod sprites (needs Python with Pillow and the game data); mod plants use a tint" >&2
+
 cat > "$APP/Contents/MacOS/PvZ" <<'EOF'
 #!/bin/sh
 # Game data: the extracted, moddable gamedata-mod folder if it exists (scripts/extract-pak.py),

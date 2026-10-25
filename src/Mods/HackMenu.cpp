@@ -78,6 +78,9 @@ namespace
 		{ ZombieType::ZOMBIE_IMP, "Diablillo" },
 		{ ZombieType::ZOMBIE_REDEYE_GARGANTUAR, "Gargantua de ojos rojos" },
 		{ ZombieType::ZOMBIE_SPEEDY, "Zombi veloz (mod)" },
+		{ ZombieType::ZOMBIE_GIANT_PAIL, "Caracubo gigante (mod)" },
+		{ ZombieType::ZOMBIE_ICE, "Zombi de hielo (mod)" },
+		{ ZombieType::ZOMBIE_GHOST, "Zombi fantasma (mod)" },
 	};
 
 	bool IsToggleKey(const SDL_Event& theEvent)

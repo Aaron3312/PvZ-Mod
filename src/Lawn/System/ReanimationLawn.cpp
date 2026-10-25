@@ -19,6 +19,7 @@
  * along with PvZ-Portable. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "Mods/ModContent.h"
 #include "../Plant.h"
 #include "../Zombie.h"
 #include "../../LawnApp.h"
@@ -79,10 +80,14 @@ void ReanimatorCache::UpdateReanimationForVariation(Reanimation* theReanim, Draw
 	}
 }
 
-void ReanimatorCache::DrawReanimatorFrame(Graphics* g, float thePosX, float thePosY, ReanimationType theReanimationType, const char* theTrackName, DrawVariation theDrawVariation)
+void ReanimatorCache::DrawReanimatorFrame(Graphics* g, float thePosX, float thePosY, ReanimationType theReanimationType, const char* theTrackName, DrawVariation theDrawVariation, const char* theOverrideTrack, Image* theOverrideImage)
 {
 	Reanimation aReanim;
 	aReanim.ReanimationInitializeType(thePosX, thePosY, theReanimationType);
+	if (theOverrideTrack && theOverrideImage)
+	{
+		aReanim.SetImageOverride(theOverrideTrack, theOverrideImage);
+	}
 
 	if (theTrackName != nullptr && aReanim.TrackExists(theTrackName))
 	{
@@ -232,6 +237,25 @@ std::unique_ptr<MemoryImage> ReanimatorCache::MakeCachedPlantFrame(SeedType theS
 		aMemoryGraphics.SetColorizeImages(true);
 		aMemoryGraphics.SetColor(Color(255, 64, 64));
 		DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_idle", theDrawVariation);
+	}
+	else if (ModContent::HasNutImages(theSeedType))
+	{
+		DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_idle", theDrawVariation, "anim_face", ModContent::GetNutImages(theSeedType).mBody);
+	}
+	else if (theSeedType == SeedType::SEED_ICE_NUT || theSeedType == SeedType::SEED_PEA_NUT || theSeedType == SeedType::SEED_GOLD_SUNFLOWER)
+	{
+		aMemoryGraphics.SetColorizeImages(true);
+		aMemoryGraphics.SetColor(theSeedType == SeedType::SEED_ICE_NUT ? Color(200, 235, 255) :
+			theSeedType == SeedType::SEED_PEA_NUT ? Color(215, 255, 170) : Color(255, 205, 90));
+		DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_idle", theDrawVariation);
+		if (theSeedType != SeedType::SEED_GOLD_SUNFLOWER)
+		{
+			// the same glow the plant has on the lawn, drawn additively over the packet portrait
+			aMemoryGraphics.SetDrawMode(Graphics::DRAWMODE_ADDITIVE);
+			aMemoryGraphics.SetColor(theSeedType == SeedType::SEED_ICE_NUT ? Color(70, 130, 210, 150) : Color(40, 110, 0, 110));
+			DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_idle", theDrawVariation);
+			aMemoryGraphics.SetDrawMode(Graphics::DRAWMODE_NORMAL);
+		}
 	}
 	else if (theSeedType == SeedType::SEED_FIRE_PEASHOOTER)
 	{

@@ -151,7 +151,7 @@ namespace
 				for (Zombie* aZombie : theApp->mBoard->mZombies)
 				{
 					if (!aZombie->mDead)
-						PvzpLogLn("ModTest: t={} zombie type {} row {} x {:.0f} velX {:.2f} body {}", sTicks, static_cast<int>(aZombie->mZombieType), aZombie->mRow, aZombie->mPosX, aZombie->mVelX, aZombie->mBodyHealth);
+						PvzpLogLn("ModTest: t={} zombie type {} row {} x {:.0f} velX {:.2f} body {} helm {} chill {} scale {:.1f}", sTicks, static_cast<int>(aZombie->mZombieType), aZombie->mRow, aZombie->mPosX, aZombie->mVelX, aZombie->mBodyHealth, aZombie->mHelmHealth, aZombie->mChilledCounter, aZombie->mScaleZombie);
 				}
 				int aCount[16] = {};
 				for (Projectile* aProjectile : theApp->mBoard->mProjectiles)

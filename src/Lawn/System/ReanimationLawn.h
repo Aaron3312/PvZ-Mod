@@ -66,7 +66,7 @@ public:
 	std::unique_ptr<MemoryImage> MakeCachedMowerFrame(LawnMowerType theMowerType);
 	std::unique_ptr<MemoryImage> MakeCachedZombieFrame(ZombieType theZombieType);
 	void         GetPlantImageSize(SeedType theSeedType, int& theOffsetX, int& theOffsetY, int& theWidth, int& theHeight);
-	void                    DrawReanimatorFrame(Graphics* g, float thePosX, float thePosY, ReanimationType theReanimationType, const char* theTrackName, DrawVariation theDrawVariation);
+	void                    DrawReanimatorFrame(Graphics* g, float thePosX, float thePosY, ReanimationType theReanimationType, const char* theTrackName, DrawVariation theDrawVariation, const char* theOverrideTrack = nullptr, Image* theOverrideImage = nullptr);
 	void                    UpdateReanimationForVariation(Reanimation* theReanim, DrawVariation theDrawVariation);
 };
 

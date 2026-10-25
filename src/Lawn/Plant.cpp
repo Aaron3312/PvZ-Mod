@@ -44,6 +44,7 @@
 #include "Widget/AchievementsScreen.h"
 #include <algorithm>
 #include <format>
+#include "Mods/ModContent.h"
 
 constinit const PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
 	{ .mSeedType = SeedType::SEED_PEASHOOTER,        .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_PEASHOOTER,    .mPacketIndex = 0,  .mSeedCost = 100, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "PEASHOOTER" },
@@ -100,7 +101,10 @@ constinit const PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
 	{ .mSeedType = SeedType::SEED_SPROUT,            .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_ZENGARDEN_SPROUT, .mPacketIndex = 33, .mSeedCost = 0,   .mRefreshTime = 3000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "SPROUT" },
 	{ .mSeedType = SeedType::SEED_LEFTPEATER,        .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_REPEATER,      .mPacketIndex = 5,  .mSeedCost = 200, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "REPEATER" },
 	// Mods (src/Mods/ModContent.h)
-	{ .mSeedType = SeedType::SEED_FIRE_PEASHOOTER,   .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_PEASHOOTER,    .mPacketIndex = 0,  .mSeedCost = 175, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "FIRE_PEASHOOTER" }
+	{ .mSeedType = SeedType::SEED_FIRE_PEASHOOTER,   .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_PEASHOOTER,    .mPacketIndex = 0,  .mSeedCost = 175, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "FIRE_PEASHOOTER" },
+	{ .mSeedType = SeedType::SEED_ICE_NUT,           .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_WALLNUT,       .mPacketIndex = 2,  .mSeedCost = 100, .mRefreshTime = 3000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "ICE_NUT" },
+	{ .mSeedType = SeedType::SEED_PEA_NUT,           .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_WALLNUT,       .mPacketIndex = 2,  .mSeedCost = 150, .mRefreshTime = 3000,   .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "PEA_NUT" },
+	{ .mSeedType = SeedType::SEED_GOLD_SUNFLOWER,    .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_SUNFLOWER,     .mPacketIndex = 1,  .mSeedCost = 100, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 2500, .mPlantName = "GOLD_SUNFLOWER" }
 };
 
 Plant::Plant()
@@ -174,7 +178,7 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
 		if (mApp->IsWallnutBowlingLevel() && aBodyReanim->TrackExists("_ground"))
 		{
 			aBodyReanim->SetFramesForLayer("_ground");
-			if (mSeedType == SeedType::SEED_WALLNUT || mSeedType == SeedType::SEED_EXPLODE_O_NUT)
+			if (ModContent::BaseSeedType(mSeedType) == SeedType::SEED_WALLNUT || mSeedType == SeedType::SEED_EXPLODE_O_NUT)
 				aBodyReanim->mAnimRate = RandRangeFloat(12.0f, 18.0f);
 			else if (mSeedType == SeedType::SEED_GIANT_WALLNUT)
 				aBodyReanim->mAnimRate = RandRangeFloat(6.0f, 10.0f);
@@ -198,7 +202,7 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
 	else
 		mLaunchCounter = 0;
 
-	switch (theSeedType)
+	switch (ModContent::BaseSeedType(theSeedType))
 	{
 	case SeedType::SEED_BLOVER:
 	{
@@ -1001,7 +1005,7 @@ void Plant::UpdateShooter()
 
 bool Plant::MakesSun()
 {
-	return mSeedType == SeedType::SEED_SUNFLOWER || mSeedType == SeedType::SEED_TWINSUNFLOWER || mSeedType == SeedType::SEED_SUNSHROOM;
+	return ModContent::BaseSeedType(mSeedType) == SeedType::SEED_SUNFLOWER || mSeedType == SeedType::SEED_TWINSUNFLOWER || mSeedType == SeedType::SEED_SUNSHROOM;
 }
 
 void Plant::UpdateProductionPlant()
@@ -1052,7 +1056,7 @@ void Plant::UpdateProductionPlant()
 		{
 			mBoard->AddCoin(mX, mY, CoinType::COIN_SUN, CoinMotion::COIN_MOTION_FROM_PLANT);
 		}
-		else if (mSeedType == SeedType::SEED_TWINSUNFLOWER)
+		else if (mSeedType == SeedType::SEED_TWINSUNFLOWER || mSeedType == SeedType::SEED_GOLD_SUNFLOWER)
 		{
 			mBoard->AddCoin(mX, mY, CoinType::COIN_SUN, CoinMotion::COIN_MOTION_FROM_PLANT);
 			mBoard->AddCoin(mX, mY, CoinType::COIN_SUN, CoinMotion::COIN_MOTION_FROM_PLANT);
@@ -2682,6 +2686,18 @@ void Plant::UpdateReanimColor()
 	{
 		aColorOverride = Color(255, 150, 90);
 	}
+	else if (mSeedType == SeedType::SEED_ICE_NUT && !ModContent::HasNutImages(mSeedType))
+	{
+		aColorOverride = Color(200, 235, 255);
+	}
+	else if (mSeedType == SeedType::SEED_PEA_NUT && !ModContent::HasNutImages(mSeedType))
+	{
+		aColorOverride = Color(215, 255, 170);
+	}
+	else if (mSeedType == SeedType::SEED_GOLD_SUNFLOWER)
+	{
+		aColorOverride = Color(255, 205, 90);
+	}
 	else
 	{
 		aColorOverride = Color(255, 255, 255);
@@ -2713,6 +2729,21 @@ void Plant::UpdateReanimColor()
 	else if (mSeedType == SeedType::SEED_FIRE_PEASHOOTER)
 	{
 		aBodyReanim->mExtraAdditiveColor = Color(255, 70, 0, 90);
+		aBodyReanim->mEnableExtraAdditiveDraw = true;
+	}
+	else if (mSeedType == SeedType::SEED_ICE_NUT && !ModContent::HasNutImages(mSeedType))
+	{
+		aBodyReanim->mExtraAdditiveColor = Color(70, 130, 210, 150);
+		aBodyReanim->mEnableExtraAdditiveDraw = true;
+	}
+	else if (mSeedType == SeedType::SEED_PEA_NUT && !ModContent::HasNutImages(mSeedType))
+	{
+		aBodyReanim->mExtraAdditiveColor = Color(40, 110, 0, 110);
+		aBodyReanim->mEnableExtraAdditiveDraw = true;
+	}
+	else if (mSeedType == SeedType::SEED_GOLD_SUNFLOWER)
+	{
+		aBodyReanim->mExtraAdditiveColor = Color(120, 80, 0, 80);
 		aBodyReanim->mEnableExtraAdditiveDraw = true;
 	}
 	else
@@ -2907,7 +2938,7 @@ Reanimation* Plant::AttachBlinkAnim(Reanimation* theReanimBody)
 	const char* aTrackToPlay = "anim_blink";
 	const char* aTrackToAttach = nullptr;
 
-	if (mSeedType == SeedType::SEED_WALLNUT || mSeedType == SeedType::SEED_TALLNUT ||
+	if (ModContent::BaseSeedType(mSeedType) == SeedType::SEED_WALLNUT || mSeedType == SeedType::SEED_TALLNUT ||
 		mSeedType == SeedType::SEED_EXPLODE_O_NUT || mSeedType == SeedType::SEED_GIANT_WALLNUT)
 	{
 		int aHit = Rand(10);
@@ -3046,7 +3077,7 @@ void Plant::DoBlink()
 		(mSeedType == SeedType::SEED_GARLIC && aBodyReanim->GetImageOverride("anim_face") == IMAGE_REANIM_GARLIC_BODY3))
 		return;
 
-	if (mSeedType == SeedType::SEED_WALLNUT || mSeedType == SeedType::SEED_TALLNUT ||
+	if (ModContent::BaseSeedType(mSeedType) == SeedType::SEED_WALLNUT || mSeedType == SeedType::SEED_TALLNUT ||
 		mSeedType == SeedType::SEED_EXPLODE_O_NUT || mSeedType == SeedType::SEED_GIANT_WALLNUT)
 	{
 		mBlinkCountdown = 1000 + Rand(1000);
@@ -3107,8 +3138,18 @@ void Plant::AnimateNuts()
 
 	Image* aCracked1;
 	Image* aCracked2;
+	Image* aHealthy = nullptr;	// the reanim's own image, except for the mod nuts
 	const char* aTrackToOverride;
-	if (mSeedType == SeedType::SEED_WALLNUT)
+	if (ModContent::HasNutImages(mSeedType))
+	{
+		const ModContent::NutImages& aNutImages = ModContent::GetNutImages(mSeedType);
+		aCracked1 = aNutImages.mCracked1;
+		aCracked2 = aNutImages.mCracked2;
+		aHealthy = aNutImages.mBody;
+		aTrackToOverride = "anim_face";
+		mBlinkCountdown = 0;	// their eyelids would be brown
+	}
+	else if (ModContent::BaseSeedType(mSeedType) == SeedType::SEED_WALLNUT)
 	{
 		aCracked1 = IMAGE_REANIM_WALLNUT_CRACKED1;
 		aCracked2 = IMAGE_REANIM_WALLNUT_CRACKED2;
@@ -3148,7 +3189,7 @@ void Plant::AnimateNuts()
 	}
 	else
 	{
-		aBodyReanim->SetImageOverride(aTrackToOverride, nullptr);
+		aBodyReanim->SetImageOverride(aTrackToOverride, aHealthy);
 	}
 
 	if (IsInPlay() && !mApp->IsIZombieLevel())
@@ -3455,7 +3496,7 @@ void Plant::Animate()
 		return;
 	}
 
-	if (mSeedType == SeedType::SEED_WALLNUT || mSeedType == SeedType::SEED_TALLNUT)
+	if (ModContent::BaseSeedType(mSeedType) == SeedType::SEED_WALLNUT || mSeedType == SeedType::SEED_TALLNUT)
 	{
 		AnimateNuts();
 	}
@@ -3499,7 +3540,7 @@ float PlantFlowerPotHeightOffset(SeedType theSeedType, float theFlowerPotScale)
 	float aHeightOffset = -5.0f * theFlowerPotScale;
 	float aScaleOffsetFix = 0.0f;
 
-	switch (theSeedType)
+	switch (ModContent::BaseSeedType(theSeedType))
 	{
 	case SeedType::SEED_CHOMPER:
 	case SeedType::SEED_PLANTERN:
@@ -4521,6 +4562,9 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 		break;
 	case SeedType::SEED_FIRE_PEASHOOTER:
 		aProjectileType = ProjectileType::PROJECTILE_FIREBALL;
+		break;
+	case SeedType::SEED_PEA_NUT:
+		aProjectileType = ProjectileType::PROJECTILE_PEA;
 		break;
 	case SeedType::SEED_PUFFSHROOM:
 	case SeedType::SEED_SCAREDYSHROOM:
