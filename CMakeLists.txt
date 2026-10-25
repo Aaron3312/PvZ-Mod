@@ -49,6 +49,7 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
 	src/Lawn/*.cpp
 	src/Lawn/Widget/*.cpp
 	src/Lawn/System/*.cpp
+	src/Mods/ModContent.cpp	# new plants and zombies, always built
 )
 
 option(LOW_MEMORY "Enable low memory mode" OFF)
@@ -129,9 +130,9 @@ if(PVZ_HACK_MENU AND (ANDROID OR IOS OR EMSCRIPTEN OR NINTENDO_SWITCH))
 endif()
 if(PVZ_HACK_MENU)
 	set(IMGUI_DIR ${PROJECT_SOURCE_DIR}/third_party/imgui)	# Dear ImGui v1.93.0 (c1aaac6)
-	file(GLOB MOD_SOURCES CONFIGURE_DEPENDS src/Mods/*.cpp)
 	list(APPEND SOURCES
-		${MOD_SOURCES}
+		src/Mods/Mods.cpp
+		src/Mods/HackMenu.cpp
 		${IMGUI_DIR}/imgui.cpp
 		${IMGUI_DIR}/imgui_draw.cpp
 		${IMGUI_DIR}/imgui_tables.cpp

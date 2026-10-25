@@ -76,6 +76,7 @@
 #ifdef PVZ_HACK_MENU
 #include "Mods/Mods.h"
 #endif
+#include "Mods/ModContent.h"
 
 bool gIsPartnerBuild = false;
 bool gSlowMo = false;
@@ -1656,6 +1657,7 @@ void LawnApp::LoadingThreadProc()
 	LoadProperties("properties/default.xml", false, false);
 	LoadProperties("properties/Layout.xml", false, false);
 	LoadProperties("properties/pvz-portable.xml", false, false);
+	ModContent::RegisterStrings(this);
 
 	if (mTitleScreen)
 	{

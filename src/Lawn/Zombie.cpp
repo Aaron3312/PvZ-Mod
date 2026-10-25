@@ -46,6 +46,7 @@
 #ifdef PVZ_HACK_MENU
 #include "Mods/Mods.h"
 #endif
+#include "Mods/ModContent.h"
 #include <algorithm>
 
 constexpr const int ZOMBIE_START_RANDOM_OFFSET = 40;
@@ -114,6 +115,8 @@ constinit const ZombieDefinition gZombieDefs[NUM_ZOMBIE_TYPES] = {
 	{ .mZombieType = ZOMBIE_SQUASH_HEAD, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 3, .mStartingLevel = 99, .mFirstAllowedWave = 10, .mPickWeight = 2000, .mZombieName = "ZOMBIE" },
 	{ .mZombieType = ZOMBIE_TALLNUT_HEAD, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 4, .mStartingLevel = 99, .mFirstAllowedWave = 10, .mPickWeight = 2000, .mZombieName = "ZOMBIE" },
 	{ .mZombieType = ZOMBIE_REDEYE_GARGANTUAR, .mReanimationType = REANIM_GARGANTUAR, .mZombieValue = 10, .mStartingLevel = 48, .mFirstAllowedWave = 15, .mPickWeight = 6000, .mZombieName = "REDEYED_GARGANTUAR" },
+	// Mods (src/Mods/ModContent.h)
+	{ .mZombieType = ZOMBIE_SPEEDY, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 2, .mStartingLevel = 22, .mFirstAllowedWave = 3, .mPickWeight = 1500, .mZombieName = "SPEEDY_ZOMBIE" },
 };
 
 static ZombieType gBossZombieList[] = {
@@ -251,6 +254,7 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 	switch (theType)
 	{
 	case ZombieType::ZOMBIE_NORMAL:
+	case ZombieType::ZOMBIE_SPEEDY:
 		LoadPlainZombieReanim();
 		break;
 
@@ -1230,6 +1234,11 @@ void Zombie::PickRandomSpeed()
 	}
 
 	UpdateAnimSpeed();
+
+	if (mZombieType == ZombieType::ZOMBIE_SPEEDY)
+	{
+		mVelX *= ModContent::SPEEDY_ZOMBIE_SPEED;
+	}
 }
 
 void Zombie::BungeeStealTarget()
@@ -5719,6 +5728,12 @@ void Zombie::DrawReanim(Graphics* g, const ZombieDrawPosition& theDrawPos, int t
 	{
 		aColorOverride = Color(100, 150, 25, aFadeAlpha);
 		aExtraAdditiveColor = aColorOverride;
+		aEnableExtraAdditiveDraw = true;
+	}
+	else if (mZombieType == ZombieType::ZOMBIE_SPEEDY)
+	{
+		aColorOverride = Color(255, 140, 140, aFadeAlpha);
+		aExtraAdditiveColor = Color(120, 0, 0, aFadeAlpha);
 		aEnableExtraAdditiveDraw = true;
 	}
 	if (mJustGotShotCounter > 0 && !IsBobsledTeamWithSled())

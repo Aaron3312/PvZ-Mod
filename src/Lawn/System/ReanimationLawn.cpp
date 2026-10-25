@@ -233,6 +233,13 @@ std::unique_ptr<MemoryImage> ReanimatorCache::MakeCachedPlantFrame(SeedType theS
 		aMemoryGraphics.SetColor(Color(255, 64, 64));
 		DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_idle", theDrawVariation);
 	}
+	else if (theSeedType == SeedType::SEED_FIRE_PEASHOOTER)
+	{
+		aMemoryGraphics.SetColorizeImages(true);
+		aMemoryGraphics.SetColor(Color(255, 150, 90));
+		DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_idle", theDrawVariation);
+		DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_head_idle", theDrawVariation);
+	}
 	else
 	{
 		DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_idle", theDrawVariation);

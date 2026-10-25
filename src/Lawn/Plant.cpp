@@ -98,7 +98,9 @@ constinit const PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
 	{ .mSeedType = SeedType::SEED_EXPLODE_O_NUT,     .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_WALLNUT,       .mPacketIndex = 2,  .mSeedCost = 0,   .mRefreshTime = 3000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "EXPLODE_O_NUT" },
 	{ .mSeedType = SeedType::SEED_GIANT_WALLNUT,     .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_WALLNUT,       .mPacketIndex = 2,  .mSeedCost = 0,   .mRefreshTime = 3000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "GIANT_WALLNUT" },
 	{ .mSeedType = SeedType::SEED_SPROUT,            .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_ZENGARDEN_SPROUT, .mPacketIndex = 33, .mSeedCost = 0,   .mRefreshTime = 3000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "SPROUT" },
-	{ .mSeedType = SeedType::SEED_LEFTPEATER,        .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_REPEATER,      .mPacketIndex = 5,  .mSeedCost = 200, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "REPEATER" }
+	{ .mSeedType = SeedType::SEED_LEFTPEATER,        .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_REPEATER,      .mPacketIndex = 5,  .mSeedCost = 200, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "REPEATER" },
+	// Mods (src/Mods/ModContent.h)
+	{ .mSeedType = SeedType::SEED_FIRE_PEASHOOTER,   .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_PEASHOOTER,    .mPacketIndex = 0,  .mSeedCost = 175, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "FIRE_PEASHOOTER" }
 };
 
 Plant::Plant()
@@ -217,6 +219,7 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
 		break;
 	}
 	case SeedType::SEED_PEASHOOTER:
+	case SeedType::SEED_FIRE_PEASHOOTER:
 	case SeedType::SEED_SNOWPEA:
 	case SeedType::SEED_REPEATER:
 	case SeedType::SEED_LEFTPEATER:
@@ -2675,6 +2678,10 @@ void Plant::UpdateReanimColor()
 	{
 		aColorOverride = Color(255, 64, 64);
 	}
+	else if (mSeedType == SeedType::SEED_FIRE_PEASHOOTER)
+	{
+		aColorOverride = Color(255, 150, 90);
+	}
 	else
 	{
 		aColorOverride = Color(255, 255, 255);
@@ -2701,6 +2708,11 @@ void Plant::UpdateReanimColor()
 	{
 		int aGrayness = std::clamp(mEatenFlashCountdown * 3, 0, mImitaterType == SeedType::SEED_IMITATER ? 128 : 255);
 		aBodyReanim->mExtraAdditiveColor = Color(aGrayness, aGrayness, aGrayness);
+		aBodyReanim->mEnableExtraAdditiveDraw = true;
+	}
+	else if (mSeedType == SeedType::SEED_FIRE_PEASHOOTER)
+	{
+		aBodyReanim->mExtraAdditiveColor = Color(255, 70, 0, 90);
 		aBodyReanim->mEnableExtraAdditiveDraw = true;
 	}
 	else
@@ -2961,7 +2973,7 @@ Reanimation* Plant::AttachBlinkAnim(Reanimation* theReanimBody)
 			aTrackToAttach = "anim_face2";
 		}
 	}
-	else if (mSeedType == SeedType::SEED_PEASHOOTER || mSeedType == SeedType::SEED_SNOWPEA || mSeedType == SeedType::SEED_REPEATER || mSeedType == SeedType::SEED_LEFTPEATER || mSeedType == SeedType::SEED_GATLINGPEA)
+	else if (mSeedType == SeedType::SEED_PEASHOOTER || mSeedType == SeedType::SEED_FIRE_PEASHOOTER || mSeedType == SeedType::SEED_SNOWPEA || mSeedType == SeedType::SEED_REPEATER || mSeedType == SeedType::SEED_LEFTPEATER || mSeedType == SeedType::SEED_GATLINGPEA)
 	{
 		if (theReanimBody->TrackExists("anim_stem"))
 		{
@@ -3504,6 +3516,7 @@ float PlantFlowerPotHeightOffset(SeedType theSeedType, float theFlowerPotScale)
 	case SeedType::SEED_HYPNOSHROOM:
 	case SeedType::SEED_MAGNETSHROOM:
 	case SeedType::SEED_PEASHOOTER:
+	case SeedType::SEED_FIRE_PEASHOOTER:
 	case SeedType::SEED_REPEATER:
 	case SeedType::SEED_LEFTPEATER:
 	case SeedType::SEED_SNOWPEA:
@@ -4506,6 +4519,9 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 	case SeedType::SEED_SNOWPEA:
 		aProjectileType = ProjectileType::PROJECTILE_SNOWPEA;
 		break;
+	case SeedType::SEED_FIRE_PEASHOOTER:
+		aProjectileType = ProjectileType::PROJECTILE_FIREBALL;
+		break;
 	case SeedType::SEED_PUFFSHROOM:
 	case SeedType::SEED_SCAREDYSHROOM:
 	case SeedType::SEED_SEASHROOM:
@@ -4585,7 +4601,7 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 		aOriginX = mX + 12;
 		aOriginY = mY - 56;
 	}
-	else if (mSeedType == SeedType::SEED_PEASHOOTER || mSeedType == SeedType::SEED_SNOWPEA || mSeedType == SeedType::SEED_REPEATER)
+	else if (mSeedType == SeedType::SEED_PEASHOOTER || mSeedType == SeedType::SEED_FIRE_PEASHOOTER || mSeedType == SeedType::SEED_SNOWPEA || mSeedType == SeedType::SEED_REPEATER)
 	{
 		int aOffsetX, aOffsetY;
 		GetPeaHeadOffset(aOffsetX, aOffsetY);
