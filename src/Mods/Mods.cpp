@@ -10,6 +10,8 @@
 #include "Lawn/Widget/GameSelector.h"
 #include "Lawn/Widget/SeedChooserScreen.h"
 #include "ModContent.h"
+#include "HackMenu.h"
+#include <format>
 #include "Lawn/Projectile.h"
 #include "PvzpLib/PvzpDebug.h"
 #include <SDL.h>
@@ -55,6 +57,14 @@ namespace
 	// PVZ_MOD_TEST=1 drives the game without a mouse so new content can be checked on screen:
 	// skip the title, start the adventure, let the seed chooser pick, then place the mod plants
 	// and spawn the mod zombies once. Run it with -savedir pointing at a copy of the saves.
+	// PVZ_MOD_TEST_SHOTS=<folder>: the test saves its own frames there, so nobody's screen is captured.
+	void TestScreenshot(const char* theName)
+	{
+		const char* aFolder = SDL_getenv("PVZ_MOD_TEST_SHOTS");
+		if (aFolder)
+			HackMenu::RequestScreenshot(std::format("{}/{}.png", aFolder, theName).c_str());
+	}
+
 	void UpdateModTest(LawnApp* theApp)
 	{
 		static int sStep = 0;
@@ -88,7 +98,19 @@ namespace
 			}
 			else if (theApp->mSeedChooserScreen && sTicks > 500)
 			{
-				theApp->mSeedChooserScreen->PickRandomSeeds();
+				// PVZ_MOD_TEST=chooser stays on the seed chooser with the Mods page open.
+				static const bool sStayInChooser = SDL_strcmp(SDL_getenv("PVZ_MOD_TEST"), "chooser") == 0;
+				if (sStayInChooser)
+				{
+					if (!theApp->mSeedChooserScreen->mShowModPage)
+						theApp->mSeedChooserScreen->ButtonDepress(107);	// SeedChooserScreen_ModPage (private)
+					else
+						TestScreenshot("chooser-mods");
+				}
+				else
+				{
+					theApp->mSeedChooserScreen->PickRandomSeeds();
+				}
 				sTicks = 0;
 			}
 			break;
@@ -122,6 +144,8 @@ namespace
 			break;
 		case 4:
 			// Every 2 s: each zombie and the projectile mix, so the result can be read from the log.
+			if (sTicks == 600 || sTicks == 900)
+				TestScreenshot(std::format("board-{}", sTicks).c_str());
 			if (theApp->mBoard && sTicks % 200 == 0 && sTicks <= 3000)
 			{
 				for (Zombie* aZombie : theApp->mBoard->mZombies)

@@ -2285,6 +2285,10 @@ bool LawnApp::HasSeedType(SeedType theSeedType)
 	if (IsTrialStageLocked() && theSeedType >= SeedType::SEED_JALAPENO)
 		return false;
 
+	// Mod plants unlock with the second adventure; outside the adventure they are always there.
+	if (ModContent::IsModSeed(theSeedType))
+		return HasFinishedAdventure() || !IsAdventureMode();
+
 	/*  optimization
 	if (theSeedType >= SeedType::SEED_GATLINGPEA && theSeedType <= SeedType::SEED_IMITATER)
 		return mPlayerInfo->mPurchases[theSeedType - SeedType::SEED_GATLINGPEA];

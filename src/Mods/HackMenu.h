@@ -9,6 +9,7 @@ namespace HackMenu
 {
 	bool	ProcessEvent(const SDL_Event& theEvent);	// true when the menu used the event
 	void	Render();									// call after the game's draw flush, before the swap
+	void	RequestScreenshot(const char* thePngPath);	// saves the next frame (without the menu) as PNG
 }
 
 #endif

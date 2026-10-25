@@ -68,7 +68,8 @@ private:
 		SeedChooserScreen_Almanac = 103,
 		SeedChooserScreen_Menu = 104,
 		SeedChooserScreen_Store = 105,
-		SeedChooserScreen_Imitater = 106
+		SeedChooserScreen_Imitater = 106,
+		SeedChooserScreen_ModPage = 107	// mods: switches the grid to the new plants
 	};
 
 public:
@@ -79,6 +80,8 @@ public:
 	std::unique_ptr<GameButton> mAlmanacButton;
 	std::unique_ptr<GameButton> mMenuButton;
 	std::unique_ptr<GameButton> mImitaterButton;
+	std::unique_ptr<GameButton> mModPageButton;
+	bool                    mShowModPage;			// the grid shows the mod plants instead of the originals
 	ChosenSeed              mChosenSeeds[NUM_SEED_TYPES];
 	LawnApp*                mApp;
 	Board*                  mBoard;
@@ -95,6 +98,8 @@ public:
 
 public:
 	SeedChooserScreen();
+	static bool  IsChooserSeed(SeedType theSeedType);	// originals 0..48 plus the mod plants
+	bool         IsOnShownPage(SeedType theSeedType);
 	~SeedChooserScreen() override;
 
 	static int   PickFromWeightedArrayUsingSpecialRandSeed(PvzpWeightedArray* theArray, int theCount, MTRand& theLevelRNG);

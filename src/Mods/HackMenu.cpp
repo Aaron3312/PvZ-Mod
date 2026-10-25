@@ -8,11 +8,40 @@
 #include "imgui.h"
 #include "backends/imgui_impl_sdl2.h"
 #include "backends/imgui_impl_opengl3.h"
+#include "SexyAppFramework/imagelib/ImageLib.h"
+#include <memory>
+#include <string>
 
 namespace
 {
 	bool gReady = false;
 	bool gOpen = false;
+	std::string gScreenshotPath;	// pending RequestScreenshot
+
+	// Reads the default framebuffer (RGBA, bottom-up) into the engine's BGRA top-down image and writes a PNG.
+	void SaveFramebuffer(const std::string& thePath)
+	{
+		int aWidth = 0, aHeight = 0;
+		SDL_GL_GetDrawableSize(static_cast<SDL_Window*>(gLawnApp->mWindow), &aWidth, &aHeight);
+		if (aWidth <= 0 || aHeight <= 0)
+			return;
+		auto aPixels = std::make_unique<uint8_t[]>(static_cast<size_t>(aWidth) * aHeight * 4);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		glReadPixels(0, 0, aWidth, aHeight, GL_RGBA, GL_UNSIGNED_BYTE, aPixels.get());
+
+		ImageLib::Image anImage;
+		anImage.mWidth = aWidth;
+		anImage.mHeight = aHeight;
+		anImage.mBits = std::make_unique<uint32_t[]>(static_cast<size_t>(aWidth) * aHeight);
+		for (int y = 0; y < aHeight; y++)
+		{
+			const uint8_t* aSrc = aPixels.get() + static_cast<size_t>(aHeight - 1 - y) * aWidth * 4;
+			uint32_t* aDst = anImage.mBits.get() + static_cast<size_t>(y) * aWidth;
+			for (int x = 0; x < aWidth; x++, aSrc += 4)
+				aDst[x] = 0xFF000000u | (aSrc[0] << 16) | (aSrc[1] << 8) | aSrc[2];
+		}
+		ImageLib::WritePNGImage(thePath, &anImage);
+	}
 	int gSpawnIndex = 0;
 
 	struct SpawnChoice
@@ -193,8 +222,19 @@ bool HackMenu::ProcessEvent(const SDL_Event& theEvent)
 	}
 }
 
+void HackMenu::RequestScreenshot(const char* thePngPath)
+{
+	gScreenshotPath = thePngPath;
+}
+
 void HackMenu::Render()
 {
+	if (!gScreenshotPath.empty() && gLawnApp && gLawnApp->mWindow)
+	{
+		SaveFramebuffer(gScreenshotPath);
+		gScreenshotPath.clear();
+	}
+
 	// The first frame creates the context and loads the saved mods, menu open or not.
 	if (!gReady && !EnsureReady())
 		return;
