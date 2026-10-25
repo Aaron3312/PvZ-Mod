@@ -103,7 +103,7 @@ namespace
 
 		ImGui::SetNextWindowPos(ImVec2(16, 16), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(560, 0), ImGuiCond_FirstUseEver);
-		if (!ImGui::Begin("Trucos  (tecla o F1 para cerrar)", &gOpen))
+		if (!ImGui::Begin("Trucos  (\xc2\xba / fn+F1 para cerrar)", &gOpen))
 		{
 			ImGui::End();
 			return;
