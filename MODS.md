@@ -40,7 +40,7 @@ Las habilidades al morir (divisor, kamikaze) saltan en `Zombie::DropLoot`, que e
 
 ## Modos de juego
 
-En **Minijuegos**, botón **Mods** abajo a la derecha. Siempre desbloqueados, 30 oleadas cada uno.
+En **Minijuegos**, botón **Mods** abajo a la derecha. Siempre desbloqueados; los cinco primeros traen 30 oleadas.
 
 | Modo | Escenario | Qué tiene |
 |---|---|---|
@@ -49,6 +49,16 @@ En **Minijuegos**, botón **Mods** abajo a la derecha. Siempre desbloqueados, 30
 | Gigantes | Día | Cada zombi 1,4 veces más grande, con el doble de vida y algo más lento |
 | Cinta mod | Día | Sin elegir semillas: la cinta trae plantas mod y algunas normales |
 | Caos en la piscina | Piscina | Los zombis de la segunda tanda, con flotadores y delfines |
+| Versus | Día | Dos jugadores: uno pone plantas y el otro manda los zombis (ver abajo) |
+
+### Versus
+
+No hay oleadas: cada zombi lo manda el jugador zombi, que gasta **cerebros**. Empieza con 50 y gana 25 cada 3 s. Los primeros 15 s no se puede mandar nada, para que las plantas arranquen. Los zombis ganan si uno llega a la casa; las plantas, si aguantan 3 minutos. Las reglas y la lista de zombis (Normal 50, Cono 75, Cubo 125, Pértiga 75, Veloz 75, Divisor 100, Kamikaze 100, Médico 125, Fútbol 175) están en `src/Mods/Versus.cpp`.
+
+- **En el mismo equipo:** las plantas con el ratón; los zombis con W/S o las flechas (carril) y 1-9 (zombi).
+- **Desde otro aparato:** mientras haya una partida versus, el juego sirve una página en el puerto 8090 (`src/Mods/VersusNet.cpp`). La dirección sale arriba de la barra del juego y lleva un código de 6 letras; sin él no deja pasar. La página muestra el juego en vivo (JPEG, unas 11 imágenes por segundo) y manda las mismas teclas, con botones para el dedo. Basta un navegador: otra Mac, un Android o un iPhone.
+- **Desde otra red:** si **Tailscale Funnel** está activado en el tailnet, el juego publica además `https://<equipo>.<tailnet>.ts.net/?c=<código>` (`tailscale funnel --bg 8090`) y lo apaga al salir del versus. `PVZ_VERSUS_FUNNEL=0` lo desactiva. En Android no hay Funnel: el teléfono se alcanza por su dirección local o la de Tailscale.
+- La partida versus no se guarda a medias.
 
 **Cómo están hechos:** cada uno es una variante de un original y comparte su código, a través de `ModContent::BaseSeedType` y `ModContent::BaseZombieType`. Sus valores van al final de `SeedType` y `ZombieType`, así que los originales conservan los suyos. Los nombres y textos del almanaque están en `src/Mods/ModContent.cpp`.
 
@@ -66,7 +76,7 @@ SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy PVZ_MOD_TEST=1 PVZ_MOD_TEST_SHOTS=/
 
 - `PVZ_MOD_TEST=1` entra en un nivel, planta las plantas nuevas junto a un lanzaguisantes normal y suelta tres de cada zombi nuevo.
 - Cada 2 s escribe en el log los zombis (tipo, fila, posición, velocidad, vida, frío, congelación, veneno y escala), cuántos proyectiles hay de cada tipo y cuántas plantas siguen vivas y heridas.
-- `=modes` abre la página Mods de los minijuegos y `=mode1`…`=mode5` juega ese modo y suelta dos de cada zombi que permite.
+- `=modes` abre la página Mods de los minijuegos y `=mode1`…`=mode5` juega ese modo y suelta dos de cada zombi que permite. `=mode6` es el versus: con `PVZ_MOD_TEST_VERSUS=1` planta una defensa y juega el lado zombi (y no hace caso al teclado de verdad), `PVZ_MOD_TEST_VERSUS_SECONDS` acorta la partida y `PVZ_VERSUS_CODE` fija el código para probar la página con curl (`/stream`, `/cmd?k=49`).
 - `=chooser` se queda en la página Mods del selector.
 - `PVZ_MOD_TEST_SHOTS` hace que el propio juego guarde capturas, así nunca se captura el escritorio.
 
@@ -96,3 +106,15 @@ ditto "dist/Plants vs. Zombies.app" "/Applications/Plants vs. Zombies.app"
 ```
 
 Los datos del juego (`main.pak` + `properties/`) salen de la copia de Steam: en la consola de Steam, `download_depot 3590 3591` (la versión Windows, 51 MB). Los datos no van en el repo.
+
+## Android (rama `feat/android`)
+
+```sh
+ANDROID_NDK=/ruta/al/ndk ANDROID_HOME=~/Library/Android/sdk scripts/make-android-apk.sh /tmp/pvz-android
+```
+
+Sin vcpkg: el script baja y compila con el NDK SDL2, libpng, libjpeg-turbo y libopenmpt (con sus decodificadores incluidos, `android/openmpt/`), luego `libmain.so`, y Gradle arma `dist/pvz-portable-android-arm64-v8a.apk` firmado con la llave de depuración. `JOBS` (2 por defecto) limita la compilación en paralelo. Necesita la plataforma 36 del SDK y un JDK 17 o más nuevo.
+
+- **Menú de trucos:** tres dedos a la vez en la pantalla lo abren y lo cierran (también la X de la ventana). Se escala con la densidad de la pantalla; arrastrar el cuerpo de la ventana la desplaza. Lo que se toca encima del menú no le llega al juego.
+- **Sprites de las nueces:** la carpeta `mods/` va junto a `main.pak` en el ZIP o la carpeta de datos que se importa; termina en `Android/data/io.github.wszqkzqk.pvzportable/files/mods/`, donde el juego la busca.
+- **Partida:** un ZIP con `userdata/users.dat`, `userdata/user1.dat` y, si se quiere seguir el nivel a medias, `userdata/game1_0.v4`. Se importa desde «Manage Data» (mantener pulsado el icono). `registry.regemu` no se importa, así que los trucos empiezan apagados.

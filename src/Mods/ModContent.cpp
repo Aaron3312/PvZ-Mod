@@ -325,7 +325,9 @@ namespace
 		char* aBase = SDL_GetBasePath();
 		std::filesystem::path aBasePath = aBase ? aBase : "";
 		SDL_free(aBase);
-		for (const std::filesystem::path& aFolder : { aBasePath / "mods", aBasePath / ".." / "Resources" / "mods" })
+		// Android has no base path: the resource importer puts mods/ next to main.pak, in the resource dir.
+		std::filesystem::path aResourcePath = gLawnApp->mResourceDir;
+		for (const std::filesystem::path& aFolder : { aBasePath / "mods", aBasePath / ".." / "Resources" / "mods", aResourcePath / "mods" })
 		{
 			std::filesystem::path aFile = aFolder / theName;
 			if (std::filesystem::is_regular_file(aFile))

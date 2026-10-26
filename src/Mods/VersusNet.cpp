@@ -20,7 +20,9 @@ void VersusNet::OnFrame()
 #include <netinet/tcp.h>
 #include <poll.h>
 #include <signal.h>
+#ifndef __ANDROID__
 #include <spawn.h>
+#endif
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -426,6 +428,7 @@ addEventListener('keydown',e=>{let k=keys[e.key];if(!k&&e.key>='1'&&e.key<='9')k
 		return !aLan.empty() ? aLan : !aTailscale.empty() ? aTailscale : !aOther.empty() ? aOther : "127.0.0.1";
 	}
 
+#ifndef __ANDROID__
 	// Runs a program (no shell) and collects its output, killing it after theTimeoutMs.
 	bool RunCommand(const std::vector<std::string>& theArgs, int theTimeoutMs, std::string* theOutput)
 	{
@@ -513,6 +516,12 @@ addEventListener('keydown',e=>{let k=keys[e.key];if(!k&&e.key>='1'&&e.key<='9')k
 		gPublicUrl = std::format("https://{}/?c={}", aHost, theCode);
 		PvzpLogLn("VersusNet: public at {}", gPublicUrl);
 	}
+#else
+	// A phone hosting a match is reached on its local (or Tailscale) address: no Funnel there.
+	void FunnelLoop(int, std::string)
+	{
+	}
+#endif
 
 	void Stop()
 	{
@@ -527,11 +536,13 @@ addEventListener('keydown',e=>{let k=keys[e.key];if(!k&&e.key>='1'&&e.key<='9')k
 			gEncodeThread.join();
 		if (gFunnelThread.joinable())
 			gFunnelThread.join();
+#ifndef __ANDROID__
 		if (gFunnelOn)
 		{
 			RunCommand({ TailscaleCli(), "funnel", "--https=443", "off" }, 5000, nullptr);
 			gFunnelOn = false;
 		}
+#endif
 		{
 			std::lock_guard<std::mutex> aLock(gFunnelMutex);
 			gPublicUrl.clear();
