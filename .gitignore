@@ -459,3 +459,6 @@ build-*/
 
 # app de macOS de scripts/make-macos-app.sh
 /dist/
+
+# enlace a las fuentes de SDL2 que crea scripts/make-android-apk.sh para Gradle
+/sdl2-src

@@ -117,4 +117,5 @@ Sin vcpkg: el script baja y compila con el NDK SDL2, libpng, libjpeg-turbo y lib
 
 - **Menú de trucos:** tres dedos a la vez en la pantalla lo abren y lo cierran (también la X de la ventana). Se escala con la densidad de la pantalla; arrastrar el cuerpo de la ventana la desplaza. Lo que se toca encima del menú no le llega al juego.
 - **Sprites de las nueces:** la carpeta `mods/` va junto a `main.pak` en el ZIP o la carpeta de datos que se importa; termina en `Android/data/io.github.wszqkzqk.pvzportable/files/mods/`, donde el juego la busca.
+- **Los dos ZIP desde la Mac:** `scripts/make-android-import-zips.py <carpeta>` arma `PvZ-datos.zip` (`main.pak`, `properties/` y los `mods/` de la app instalada) y `PvZ-partida.zip` (la partida de la Mac), y comprueba que el importador deja cada archivo en su sitio.
 - **Partida:** un ZIP con `userdata/users.dat`, `userdata/user1.dat` y, si se quiere seguir el nivel a medias, `userdata/game1_0.v4`. Se importa desde «Manage Data» (mantener pulsado el icono). `registry.regemu` no se importa, así que los trucos empiezan apagados.
