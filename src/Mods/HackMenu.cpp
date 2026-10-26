@@ -6,9 +6,11 @@
 #include "Lawn/Zombie.h"
 #include "SexyAppFramework/graphics/GLPlatform.h"
 #include "imgui.h"
+#include "imgui_internal.h"	// window list and active id, to route touches (see TouchOnMenu)
 #include "backends/imgui_impl_sdl2.h"
 #include "backends/imgui_impl_opengl3.h"
 #include "SexyAppFramework/imagelib/ImageLib.h"
+#include <algorithm>
 #include <memory>
 #include <string>
 
@@ -16,6 +18,8 @@ namespace
 {
 	bool gReady = false;
 	bool gOpen = false;
+	float gScale = 1.0f;			// menu scale: 1 on desktop, from the screen density on Android
+	bool gTouchOnMenu = false;		// the finger now on the screen went down on the menu
 	std::string gScreenshotPath;	// pending RequestScreenshot
 
 	// Reads the default framebuffer (RGBA, bottom-up) into the engine's BGRA top-down image and writes a PNG.
@@ -97,6 +101,78 @@ namespace
 		return aCode == SDL_SCANCODE_GRAVE || aCode == SDL_SCANCODE_NONUSBACKSLASH || aCode == SDL_SCANCODE_F1;
 	}
 
+	// Phones have no keyboard: three fingers on the screen within a moment toggle the menu.
+	// Only touch screens count; macOS also sends finger events for the trackpad (Mission Control swipes).
+	// The fingers are counted from the events, which may lag behind SDL's live finger list.
+	bool IsToggleTouch(const SDL_Event& theEvent)
+	{
+		static int sDown = 0;			// fingers put down in this gesture
+		static Uint32 sFirstTick = 0;	// when the first of them went down
+		static bool sFired = false;		// one toggle per gesture
+		if ((theEvent.type != SDL_FINGERDOWN && theEvent.type != SDL_FINGERUP) ||
+			SDL_GetTouchDeviceType(theEvent.tfinger.touchId) != SDL_TOUCH_DEVICE_DIRECT)
+			return false;
+
+		int aLiveFingers = SDL_GetNumTouchFingers(theEvent.tfinger.touchId);
+		if (theEvent.type == SDL_FINGERUP)
+		{
+			if (sDown > 0)
+				sDown--;
+			if (sDown == 0 || aLiveFingers <= 0)
+			{
+				sDown = 0;
+				sFired = false;
+			}
+			return false;
+		}
+
+		if (sDown == 0 || aLiveFingers <= 1)	// a new gesture (also recovers from a lost FINGERUP)
+		{
+			sDown = 0;
+			sFired = false;
+			sFirstTick = theEvent.tfinger.timestamp;
+		}
+		sDown++;
+		if (sFired || sDown < 3 || theEvent.tfinger.timestamp - sFirstTick > 800)
+			return false;
+		sFired = true;
+		return true;
+	}
+
+	// Touch sends the motion and the press in the same batch, before ImGui's next frame can update
+	// WantCaptureMouse. So a touch goes to whoever is under the finger when it goes down, and the
+	// rest of that touch (drag, release) follows it. Uses last frame's windows, popups included.
+	bool TouchOnMenu(int theX, int theY)
+	{
+		const ImGuiContext& g = *ImGui::GetCurrentContext();
+		ImVec2 aPos(static_cast<float>(theX), static_cast<float>(theY));
+		for (const ImGuiWindow* aWindow : g.Windows)
+			if (aWindow->Active && !aWindow->Hidden && aWindow->Rect().Contains(aPos))
+				return true;
+		return false;
+	}
+
+	// Android: scale the menu with the screen density (160 dpi = 1x) so text stays readable and
+	// widgets big enough for a finger: a 450 dpi phone gets x2.5, and the whole menu (about 250
+	// pixels high at x1) still fits a 1080-pixel-high screen. Desktop keeps x1;
+	// PVZ_HACK_MENU_SCALE=<x> forces a scale (testing).
+	float MenuScale()
+	{
+		if (const char* aForced = SDL_getenv("PVZ_HACK_MENU_SCALE"))
+			return std::clamp(static_cast<float>(SDL_atof(aForced)), 1.0f, 4.0f);
+#ifdef __ANDROID__
+		SDL_Window* aWindow = static_cast<SDL_Window*>(gLawnApp->mWindow);
+		float aDpi = 0.0f;
+		if (SDL_GetDisplayDPI(std::max(SDL_GetWindowDisplayIndex(aWindow), 0), &aDpi, nullptr, nullptr) == 0 && aDpi > 0.0f)
+			return std::clamp(aDpi / 160.0f * 0.9f, 1.0f, 4.0f);
+		int aWidth = 0, aHeight = 0;
+		SDL_GL_GetDrawableSize(aWindow, &aWidth, &aHeight);
+		return std::clamp(std::min(aWidth, aHeight) / 540.0f, 1.0f, 4.0f);
+#else
+		return 1.0f;
+#endif
+	}
+
 	bool EnsureReady()
 	{
 		if (gReady)
@@ -109,7 +185,20 @@ namespace
 		ImGuiIO& io = ImGui::GetIO();
 		io.IniFilename = nullptr;
 		ImGui::StyleColorsDark();
-		ImGui::GetStyle().FontSizeBase = 17.0f;
+		ImGuiStyle& aStyle = ImGui::GetStyle();
+		aStyle.FontSizeBase = 17.0f;
+		gScale = MenuScale();
+		if (gScale != 1.0f)
+		{
+			aStyle.ScaleAllSizes(gScale);
+			aStyle.FontScaleDpi = gScale;
+			aStyle.ScrollbarSize *= 1.5f;	// dragged with a finger
+			aStyle.TouchExtraPadding = ImVec2(3.0f * gScale, 3.0f * gScale);
+			io.ConfigWindowsMoveFromTitleBarOnly = true;	// dragging the body scrolls it (DrawMenu)
+		}
+#ifdef __ANDROID__
+		io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+#endif
 		ImGui_ImplSDL2_InitForOpenGL(static_cast<SDL_Window*>(gLawnApp->mWindow), gLawnApp->mContext);
 		ImGui_ImplOpenGL3_Init(gDesktopGLFallback ? "#version 120" : "#version 100");
 		Mods::Load(gLawnApp);
@@ -139,12 +228,27 @@ namespace
 		bool aChanged = false;
 		Board* aBoard = gLawnApp->mBoard;
 
-		ImGui::SetNextWindowPos(ImVec2(16, 16), ImGuiCond_FirstUseEver);
-		ImGui::SetNextWindowSize(ImVec2(560, 0), ImGuiCond_FirstUseEver);
-		if (!ImGui::Begin("Trucos  (\xc2\xba / fn+F1 para cerrar)", &gOpen))
+		const ImGuiIO& io = ImGui::GetIO();
+		ImGui::SetNextWindowPos(ImVec2(16 * gScale, 16 * gScale), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(std::min(560 * gScale, io.DisplaySize.x - 32 * gScale), 0), ImGuiCond_FirstUseEver);
+		if (gScale != 1.0f)	// scaled up it may not fit: keep it on screen and let it scroll
+			ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(io.DisplaySize.x - 32 * gScale, io.DisplaySize.y - 32 * gScale));
+#ifdef __ANDROID__
+		const char* aTitle = "Trucos  (3 dedos para cerrar)";
+#else
+		const char* aTitle = "Trucos  (\xc2\xba / fn+F1 para cerrar)";
+#endif
+		if (!ImGui::Begin(aTitle, &gOpen))
 		{
 			ImGui::End();
 			return;
+		}
+		if (gScale != 1.0f)
+		{
+			// No wheel on a phone: dragging the window body scrolls it (the title bar still moves it).
+			const ImGuiContext& g = *ImGui::GetCurrentContext();
+			if (g.ActiveId == ImGui::GetCurrentWindow()->MoveId && !g.MovingWindow && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f))
+				ImGui::SetScrollY(ImGui::GetScrollY() - io.MouseDelta.y);
 		}
 		ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
 
@@ -173,7 +277,7 @@ namespace
 			ImGui::BeginDisabled(!IsPlaying());
 			if (ImGui::Button("Matar todos los zombis"))
 				aBoard->RemoveAllZombies();
-			ImGui::SetNextItemWidth(220);
+			ImGui::SetNextItemWidth(220 * gScale);
 			ImGui::Combo("##zombi", &gSpawnIndex, [](void*, int i) { return gSpawnChoices[i].mName; }, nullptr, IM_ARRAYSIZE(gSpawnChoices));
 			ImGui::SameLine();
 			if (ImGui::Button("Invocar"))
@@ -204,21 +308,43 @@ namespace
 
 bool HackMenu::ProcessEvent(const SDL_Event& theEvent)
 {
-	if (IsToggleKey(theEvent))
+	if (IsToggleKey(theEvent) || IsToggleTouch(theEvent))
 	{
 		gOpen = !gOpen;
 		return true;
 	}
 	if (!gReady || !gOpen)
-		return false;
+	{
+		// A touch that went down on the menu stays the menu's until it ends, even if the menu closed.
+		bool aTouchMouse = (theEvent.type == SDL_MOUSEMOTION && theEvent.motion.which == SDL_TOUCH_MOUSEID) ||
+			((theEvent.type == SDL_MOUSEBUTTONDOWN || theEvent.type == SDL_MOUSEBUTTONUP) && theEvent.button.which == SDL_TOUCH_MOUSEID);
+		if (!gTouchOnMenu || !aTouchMouse)
+			return false;
+		if (theEvent.type != SDL_MOUSEMOTION)
+			gTouchOnMenu = false;
+		return true;
+	}
 
 	ImGui_ImplSDL2_ProcessEvent(&theEvent);
 	const ImGuiIO& io = ImGui::GetIO();
 	switch (theEvent.type)
 	{
 	case SDL_MOUSEMOTION:
+		if (theEvent.motion.which == SDL_TOUCH_MOUSEID)
+			return (theEvent.motion.state & SDL_BUTTON_LMASK) ? gTouchOnMenu : TouchOnMenu(theEvent.motion.x, theEvent.motion.y);
+		return io.WantCaptureMouse;
 	case SDL_MOUSEBUTTONDOWN:
+		if (theEvent.button.which == SDL_TOUCH_MOUSEID)
+			return gTouchOnMenu = TouchOnMenu(theEvent.button.x, theEvent.button.y);
+		return io.WantCaptureMouse;
 	case SDL_MOUSEBUTTONUP:
+		if (theEvent.button.which == SDL_TOUCH_MOUSEID)
+		{
+			bool aOnMenu = gTouchOnMenu;
+			gTouchOnMenu = false;
+			return aOnMenu;
+		}
+		return io.WantCaptureMouse;
 	case SDL_MOUSEWHEEL:
 		return io.WantCaptureMouse;
 	case SDL_KEYDOWN:
@@ -255,4 +381,10 @@ void HackMenu::Render()
 	DrawMenu();
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+	// PVZ_HACK_MENU_SHOT=<png>: saves one frame with the menu on it, to check its layout (e.g. with PVZ_HACK_MENU_SCALE).
+	static int sMenuFrames = 0;
+	if (++sMenuFrames == 60)
+		if (const char* aShot = SDL_getenv("PVZ_HACK_MENU_SHOT"))
+			SaveFramebuffer(aShot);
 }
