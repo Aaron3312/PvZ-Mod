@@ -1,5 +1,7 @@
 # PvZ-Portable
 
+> **This is PvZ-Mod, an unofficial fork of [wszqkzqk/PvZ-Portable](https://github.com/wszqkzqk/PvZ-Portable) with mods:** a hack menu, new plants and zombies, extra minigames and a two-player Versus mode that the second player joins from a browser. See [MODS.md](MODS.md) (in Spanish). It is a non-commercial fan project, not affiliated with or endorsed by PopCap Games or Electronic Arts. Like upstream, it contains **no game assets**: you need `main.pak` and `properties/` from your own legally purchased copy, and the mod sprites are generated locally from those files. It keeps upstream's license, LGPL-3.0. Bugs in the mods belong here, not in the upstream tracker.
+
 <div align="center">
   <img src="icon-readme.png" alt="PvZ-Portable" width="450">
 </div>
