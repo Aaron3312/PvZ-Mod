@@ -231,7 +231,7 @@ public class ResourceImportActivity extends AppCompatActivity {
                name.startsWith("Properties/") || name.startsWith("data/") ||
                name.startsWith("images/") || name.startsWith("particles/") ||
                name.startsWith("reanim/") || name.startsWith("sounds/") ||
-               name.startsWith("compiled/");
+               name.startsWith("compiled/") || name.startsWith("mods/");
     }
 
     private void importFromDirectory(Uri treeUri) {
