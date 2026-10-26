@@ -96,3 +96,15 @@ ditto "dist/Plants vs. Zombies.app" "/Applications/Plants vs. Zombies.app"
 ```
 
 Los datos del juego (`main.pak` + `properties/`) salen de la copia de Steam: en la consola de Steam, `download_depot 3590 3591` (la versión Windows, 51 MB). Los datos no van en el repo.
+
+## Android (rama `feat/android`)
+
+```sh
+ANDROID_NDK=/ruta/al/ndk ANDROID_HOME=~/Library/Android/sdk scripts/make-android-apk.sh /tmp/pvz-android
+```
+
+Sin vcpkg: el script baja y compila con el NDK SDL2, libpng, libjpeg-turbo y libopenmpt (con sus decodificadores incluidos, `android/openmpt/`), luego `libmain.so`, y Gradle arma `dist/pvz-portable-android-arm64-v8a.apk` firmado con la llave de depuración. `JOBS` (2 por defecto) limita la compilación en paralelo. Necesita la plataforma 36 del SDK y un JDK 17 o más nuevo.
+
+- **Menú de trucos:** tres dedos a la vez en la pantalla lo abren y lo cierran (también la X de la ventana). Se escala con la densidad de la pantalla; arrastrar el cuerpo de la ventana la desplaza. Lo que se toca encima del menú no le llega al juego.
+- **Sprites de las nueces:** la carpeta `mods/` va junto a `main.pak` en el ZIP o la carpeta de datos que se importa; termina en `Android/data/io.github.wszqkzqk.pvzportable/files/mods/`, donde el juego la busca.
+- **Partida:** un ZIP con `userdata/users.dat`, `userdata/user1.dat` y, si se quiere seguir el nivel a medias, `userdata/game1_0.v4`. Se importa desde «Manage Data» (mantener pulsado el icono). `registry.regemu` no se importa, así que los trucos empiezan apagados.
