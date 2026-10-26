@@ -19,6 +19,9 @@ void VersusNet::OnFrame()
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <poll.h>
+#include <signal.h>
+#include <spawn.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -38,6 +41,8 @@ void VersusNet::OnFrame()
 #include <thread>
 #include <vector>
 
+extern char** environ;
+
 namespace
 {
 	constexpr int		DEFAULT_PORT = 8090;
@@ -52,6 +57,10 @@ namespace
 	int					gListenFd = -1;
 	std::string			gCode;
 	std::string			gJoinText;					// game thread only
+	std::thread			gFunnelThread;
+	std::mutex			gFunnelMutex;
+	std::string			gPublicUrl;					// the Tailscale Funnel address, once it is up
+	std::atomic<bool>	gFunnelOn{ false };
 	std::thread			gAcceptThread;
 	std::thread			gEncodeThread;
 	std::atomic<int>	gViewers{ 0 };
@@ -258,7 +267,7 @@ namespace
 body{margin:0;background:#141210;color:#eee;font:15px -apple-system,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px 16px 16px}
 img{width:min(100%,calc((100vh - 190px)*4/3));aspect-ratio:4/3;background:#000;border-radius:8px}
 .row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:900px}
-button{background:#2a2622;color:#eee;border:1px solid #4a433c;border-radius:8px;padding:8px 10px;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;min-width:84px}
+button{background:#2a2622;color:#eee;border:1px solid #4a433c;border-radius:8px;padding:10px 10px;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;min-width:84px;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 button:active{background:#5a2a3a}
 button small{color:#f39ad0;font-size:12px}
 .lane button{min-width:130px;flex-direction:row;gap:6px;justify-content:center}
@@ -417,6 +426,94 @@ addEventListener('keydown',e=>{let k=keys[e.key];if(!k&&e.key>='1'&&e.key<='9')k
 		return !aLan.empty() ? aLan : !aTailscale.empty() ? aTailscale : !aOther.empty() ? aOther : "127.0.0.1";
 	}
 
+	// Runs a program (no shell) and collects its output, killing it after theTimeoutMs.
+	bool RunCommand(const std::vector<std::string>& theArgs, int theTimeoutMs, std::string* theOutput)
+	{
+		int aPipe[2];
+		if (pipe(aPipe) != 0)
+			return false;
+		posix_spawn_file_actions_t aActions;
+		posix_spawn_file_actions_init(&aActions);
+		posix_spawn_file_actions_adddup2(&aActions, aPipe[1], STDOUT_FILENO);
+		posix_spawn_file_actions_adddup2(&aActions, aPipe[1], STDERR_FILENO);
+		posix_spawn_file_actions_addclose(&aActions, aPipe[0]);
+		std::vector<char*> aArgv;
+		for (const std::string& aArg : theArgs)
+			aArgv.push_back(const_cast<char*>(aArg.c_str()));
+		aArgv.push_back(nullptr);
+		pid_t aPid = 0;
+		int aSpawn = posix_spawnp(&aPid, aArgv[0], &aActions, nullptr, aArgv.data(), environ);
+		posix_spawn_file_actions_destroy(&aActions);
+		close(aPipe[1]);
+		if (aSpawn != 0)
+		{
+			close(aPipe[0]);
+			return false;
+		}
+
+		uint32_t aStart = SDL_GetTicks();
+		char aBuffer[1024];
+		while (true)
+		{
+			int aLeft = theTimeoutMs - static_cast<int>(SDL_GetTicks() - aStart);
+			pollfd aPoll = { aPipe[0], POLLIN, 0 };
+			if (aLeft <= 0 || poll(&aPoll, 1, aLeft) <= 0)
+			{
+				kill(aPid, SIGTERM);
+				break;
+			}
+			ssize_t aRead = read(aPipe[0], aBuffer, sizeof(aBuffer));
+			if (aRead <= 0)
+				break;
+			if (theOutput)
+				theOutput->append(aBuffer, static_cast<size_t>(aRead));
+		}
+		close(aPipe[0]);
+		int aStatus = 0;
+		waitpid(aPid, &aStatus, 0);
+		return WIFEXITED(aStatus) && WEXITSTATUS(aStatus) == 0;
+	}
+
+	std::string TailscaleCli()
+	{
+		const char* aApp = "/Applications/Tailscale.app/Contents/MacOS/Tailscale";
+		return access(aApp, X_OK) == 0 ? aApp : "tailscale";
+	}
+
+	// Publishes the page on the internet with Tailscale Funnel (https://<this-machine>.<tailnet>.ts.net), so
+	// the other player can join from any network. PVZ_VERSUS_FUNNEL=0 keeps it on the local network.
+	void FunnelLoop(int thePort, std::string theCode)
+	{
+		const char* aEnv = SDL_getenv("PVZ_VERSUS_FUNNEL");
+		if (aEnv && SDL_strcmp(aEnv, "0") == 0)
+			return;
+
+		std::string aOutput;
+		RunCommand({ TailscaleCli(), "funnel", "--bg", "--yes", std::to_string(thePort) }, 15000, &aOutput);
+		std::string aStatus;
+		RunCommand({ TailscaleCli(), "funnel", "status" }, 5000, &aStatus);
+		if (aStatus.find(std::format("127.0.0.1:{}", thePort)) == std::string::npos)
+		{
+			PvzpLogLn("VersusNet: no Tailscale Funnel ({}), local network only", aOutput.substr(0, aOutput.find('\n')));
+			return;
+		}
+		gFunnelOn = true;
+
+		std::string aJson;
+		RunCommand({ TailscaleCli(), "status", "--json" }, 5000, &aJson);
+		size_t aSelf = aJson.find("\"Self\"");
+		size_t aKey = aSelf == std::string::npos ? std::string::npos : aJson.find("\"DNSName\": \"", aSelf);
+		if (aKey == std::string::npos)
+			return;
+		size_t aStart = aKey + 12;
+		std::string aHost = aJson.substr(aStart, aJson.find('"', aStart) - aStart);
+		if (!aHost.empty() && aHost.back() == '.')
+			aHost.pop_back();
+		std::lock_guard<std::mutex> aLock(gFunnelMutex);
+		gPublicUrl = std::format("https://{}/?c={}", aHost, theCode);
+		PvzpLogLn("VersusNet: public at {}", gPublicUrl);
+	}
+
 	void Stop()
 	{
 		if (!gRunning)
@@ -428,6 +525,17 @@ addEventListener('keydown',e=>{let k=keys[e.key];if(!k&&e.key>='1'&&e.key<='9')k
 			gAcceptThread.join();
 		if (gEncodeThread.joinable())
 			gEncodeThread.join();
+		if (gFunnelThread.joinable())
+			gFunnelThread.join();
+		if (gFunnelOn)
+		{
+			RunCommand({ TailscaleCli(), "funnel", "--https=443", "off" }, 5000, nullptr);
+			gFunnelOn = false;
+		}
+		{
+			std::lock_guard<std::mutex> aLock(gFunnelMutex);
+			gPublicUrl.clear();
+		}
 		if (gListenFd >= 0)
 		{
 			close(gListenFd);
@@ -476,14 +584,19 @@ addEventListener('keydown',e=>{let k=keys[e.key];if(!k&&e.key>='1'&&e.key<='9')k
 			gCode = aCodeEnv;
 		else
 		{
+			// Six letters and digits: with the public link anyone could try codes.
+			const char* aChars = "abcdefghjkmnpqrstuvwxyz23456789";
 			std::random_device aRandom;
-			gCode = std::to_string(1000 + aRandom() % 9000);
+			gCode.clear();
+			for (int i = 0; i < 6; i++)
+				gCode += aChars[aRandom() % 31];
 		}
 		gListenFd = aFd;
 		gJoinText = std::format("http://{}:{}/?c={}", PickAddress(), aPort, gCode);
 		gRunning = true;
 		gAcceptThread = std::thread(AcceptLoop);
 		gEncodeThread = std::thread(EncodeLoop);
+		gFunnelThread = std::thread(FunnelLoop, aPort, gCode);
 		PvzpLogLn("VersusNet: listening, join at {}", gJoinText);
 
 		static bool sAtExit = false;
@@ -547,7 +660,8 @@ addEventListener('keydown',e=>{let k=keys[e.key];if(!k&&e.key>='1'&&e.key<='9')k
 
 	std::string JoinText()
 	{
-		return gJoinText;
+		std::lock_guard<std::mutex> aLock(gFunnelMutex);
+		return gPublicUrl.empty() ? gJoinText : gPublicUrl;
 	}
 
 	bool HasViewer()

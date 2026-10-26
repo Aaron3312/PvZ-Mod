@@ -198,7 +198,7 @@ namespace ModVersus
 		std::string aAdvice = "Versus: el jugador zombi elige carril con W/S o las flechas y manda zombis con 1-9";
 		std::string aJoin = sNet.mJoinText ? sNet.mJoinText() : "";
 		if (!aJoin.empty())
-			aAdvice = std::format("Versus. Jugador zombi en otra Mac: abre {} en el navegador. O en esta Mac: W/S y 1-9", aJoin);
+			aAdvice = std::format("Versus. Jugador zombi en otro aparato: abre {} en el navegador. O aqui mismo: W/S y 1-9", aJoin);
 		theBoard->DisplayAdvice(aAdvice, MessageStyle::MESSAGE_STYLE_HINT_TALL_LONG, AdviceType::ADVICE_NONE);
 	}
 
@@ -283,16 +283,20 @@ namespace ModVersus
 			: std::format("Plantas ganan en {}:{:02}", aLeft / 60, aLeft % 60);
 		PvzpDrawString(g, aClock, 588, 565, Sexy::FONT_HOUSEOFTERROR16, Color(224, 187, 98), DrawStringJustification::DS_ALIGN_RIGHT);
 
-		// The other computer: where to connect, until someone does
+		// The other device: where to connect, in a strip above the bar until someone does
 		if (sNet.mHasViewer && sNet.mHasViewer())
 		{
 			PvzpDrawString(g, "Jugador zombi conectado", 300, 563, Sexy::FONT_BRIANNETOD12, Color(120, 255, 120), DrawStringJustification::DS_ALIGN_CENTER);
 		}
-		else if (sNet.mJoinText)
+		else if (sNet.mJoinText && !aOver)
 		{
 			std::string aJoin = sNet.mJoinText();
 			if (!aJoin.empty())
-				PvzpDrawString(g, "Otra Mac: " + aJoin, 300, 563, Sexy::FONT_BRIANNETOD12, Color(200, 200, 255), DrawStringJustification::DS_ALIGN_CENTER);
+			{
+				g->SetColor(Color(0, 0, 0, 160));
+				g->FillRect(5, 527, 588, 19);
+				PvzpDrawString(g, "Jugador zombi en otro aparato: " + aJoin, 300, 541, Sexy::FONT_BRIANNETOD12, Color(200, 200, 255), DrawStringJustification::DS_ALIGN_CENTER);
+			}
 		}
 
 		for (int i = 0; i < NUM_ROSTER; i++)
