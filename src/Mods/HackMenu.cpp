@@ -1,5 +1,6 @@
 #include <SDL.h>
 #include "HackMenu.h"
+#include "VersusNet.h"
 #include "Mods.h"
 #include "LawnApp.h"
 #include "Lawn/Board.h"
@@ -237,6 +238,8 @@ void HackMenu::RequestScreenshot(const char* thePngPath)
 
 void HackMenu::Render()
 {
+	VersusNet::OnFrame();	// before the menu is drawn, so the other computer doesn't see it
+
 	if (!gScreenshotPath.empty() && gLawnApp && gLawnApp->mWindow)
 	{
 		SaveFramebuffer(gScreenshotPath);

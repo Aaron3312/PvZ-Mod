@@ -28,6 +28,7 @@
 #include "Mods/Mods.h"
 #endif
 #include "Mods/ModContent.h"
+#include "Mods/Versus.h"
 #include "BoardInclude.h"
 #include "LawnCommon.h"
 #include "System/Music.h"
@@ -345,6 +346,7 @@ bool Board::NeedSaveGame()
 		mApp->mGameMode != GameMode::GAMEMODE_INTRO &&
 		mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN &&
 		mApp->mGameMode != GameMode::GAMEMODE_TREE_OF_WISDOM &&
+		!ModVersus::IsVersus(mApp->mGameMode) &&
 		mApp->mGameScene == GameScenes::SCENE_PLAYING;
 }
 
@@ -903,6 +905,7 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_MOD_INVASION:
 	case GameMode::GAMEMODE_MOD_GIANTS:
 	case GameMode::GAMEMODE_MOD_CONVEYOR:
+	case GameMode::GAMEMODE_MOD_VERSUS:
 		mBackground = BackgroundType::BACKGROUND_1_DAY;
 		break;
 
@@ -1640,6 +1643,7 @@ void Board::StartLevel()
 	mCoinBankFadeCount = 0;
 	mApp->mLastLevelStats->Reset();
 	mChallenge->StartLevel();
+	ModVersus::StartLevel(this);
 
 	// the unsigned underflow below is intentional
 	unsigned int aSurvivalStage = mApp->mGameMode - GAMEMODE_SURVIVAL_ENDLESS_STAGE_1;
@@ -5246,6 +5250,8 @@ void Board::UpdateZombieSpawning()
 {
 	if (mApp->mGameMode == GameMode::GAMEMODE_UPSELL || mApp->mGameMode == GameMode::GAMEMODE_INTRO)
 		return;
+	if (ModVersus::IsVersus(mApp->mGameMode))
+		return;	// the zombie player sends every zombie (Mods/Versus.cpp)
 
 	if (mFinalWaveSoundCounter > 0)
 	{
@@ -5664,6 +5670,7 @@ void Board::UpdateGame()
 	mMainCounter++;
 	UpdateSunSpawning();
 	UpdateZombieSpawning();
+	ModVersus::Update(this);
 	UpdateIce();
 	if (mIceTrapCounter > 0)
 	{
@@ -7397,6 +7404,7 @@ void Board::DrawUITop(Graphics* g)
 	{
 		DrawProgressMeter(g);
 		DrawLevel(g);
+		ModVersus::Draw(this, g);
 	}
 	if (mStoreButton && mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_LAST_STAND)
 	{
@@ -7638,6 +7646,8 @@ void Board::DoTypingCheck(KeyCode theKey)
 void Board::KeyDown(KeyCode theKey)
 {
 	DoTypingCheck(theKey);
+	if (mApp->mGameScene == GameScenes::SCENE_PLAYING && ModVersus::KeyDown(this, theKey))
+		return;
 
 	if (mApp->mGameScene == GameScenes::SCENE_LEVEL_INTRO &&
 		mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN &&

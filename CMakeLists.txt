@@ -50,6 +50,7 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
 	src/Lawn/Widget/*.cpp
 	src/Lawn/System/*.cpp
 	src/Mods/ModContent.cpp	# new plants and zombies, always built
+	src/Mods/Versus.cpp		# two-player versus mode, always built
 )
 
 option(LOW_MEMORY "Enable low memory mode" OFF)
@@ -133,6 +134,7 @@ if(PVZ_HACK_MENU)
 	list(APPEND SOURCES
 		src/Mods/Mods.cpp
 		src/Mods/HackMenu.cpp
+		src/Mods/VersusNet.cpp
 		${IMGUI_DIR}/imgui.cpp
 		${IMGUI_DIR}/imgui_draw.cpp
 		${IMGUI_DIR}/imgui_tables.cpp

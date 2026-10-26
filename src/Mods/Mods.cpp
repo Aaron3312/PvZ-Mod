@@ -66,7 +66,7 @@ namespace
 			HackMenu::RequestScreenshot(std::format("{}/{}.png", aFolder, theName).c_str());
 	}
 
-	// PVZ_MOD_TEST=modes opens the Mods minigame page; =mode1..mode5 also plays that mode.
+	// PVZ_MOD_TEST=modes opens the Mods minigame page; =mode1..mode6 also plays that mode.
 	int TestModeNumber()
 	{
 		static const int sModeNumber = [] {
@@ -165,7 +165,14 @@ namespace
 			}
 			break;
 		case 3:
-			if (TestModeNumber() > 0 && theApp->mBoard && theApp->mGameScene == GameScenes::SCENE_PLAYING && sTicks > 250)
+			if (TestModeNumber() > 0 && theApp->mBoard && theApp->mGameScene == GameScenes::SCENE_PLAYING && sTicks > 250 &&
+				theApp->mGameMode == GameMode::GAMEMODE_MOD_VERSUS)
+			{
+				// Versus has no waves: PVZ_MOD_TEST_VERSUS plays both sides from Versus.cpp.
+				sStep = 4;
+				sTicks = 0;
+			}
+			else if (TestModeNumber() > 0 && theApp->mBoard && theApp->mGameScene == GameScenes::SCENE_PLAYING && sTicks > 250)
 			{
 				// In a mod mode: two of each zombie the mode allows, no plants, to see the mode itself.
 				Board* aBoard = theApp->mBoard;

@@ -31,6 +31,7 @@
 #include "Challenge.h"
 #include "SeedPacket.h"
 #include "Projectile.h"
+#include "../Mods/Versus.h"
 #include "../LawnApp.h"
 #include "../Resources.h"
 #include "CursorObject.h"
@@ -2533,6 +2534,11 @@ void Challenge::InitZombieWaves()
 		aList[ZOMBIE_SPLITTER] = true;
 		aList[ZOMBIE_HOPPER] = true;
 		aList[ZOMBIE_SPEEDY] = true;
+	}
+	else if (aGameMode == GAMEMODE_MOD_VERSUS)
+	{
+		for (int i = 0; i < ModVersus::NUM_ROSTER; i++)
+			aList[ModVersus::GetRosterEntry(i).mZombieType] = true;
 	}
 	else if (aGameMode == GAMEMODE_MOD_GIANTS)
 	{

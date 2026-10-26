@@ -55,6 +55,7 @@ namespace
 		{ "MOD_GIANTS", "Gigantes" },
 		{ "MOD_CONVEYOR", "Cinta mod" },
 		{ "MOD_POOL_CHAOS", "Caos en la piscina" },
+		{ "MOD_VERSUS", "Versus" },
 
 		{ "POISON_PEASHOOTER", "Lanzaveneno" },
 		{ "POISON_PEASHOOTER_TOOLTIP", "Sus guisantes envenenan" },

@@ -113,6 +113,7 @@ constinit const ChallengeDefinition gChallengeDefs[NUM_CHALLENGE_MODES] = {
 	{ .mChallengeMode = GameMode::GAMEMODE_MOD_GIANTS, .mChallengeIconIndex = 12, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 0, .mCol = 2, .mChallengeName = "[MOD_GIANTS]" },
 	{ .mChallengeMode = GameMode::GAMEMODE_MOD_CONVEYOR, .mChallengeIconIndex = 4, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 0, .mCol = 3, .mChallengeName = "[MOD_CONVEYOR]" },
 	{ .mChallengeMode = GameMode::GAMEMODE_MOD_POOL_CHAOS, .mChallengeIconIndex = 7, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 0, .mCol = 4, .mChallengeName = "[MOD_POOL_CHAOS]" },
+	{ .mChallengeMode = GameMode::GAMEMODE_MOD_VERSUS, .mChallengeIconIndex = 11, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 1, .mCol = 0, .mChallengeName = "[MOD_VERSUS]" },
 	{ .mChallengeMode = GameMode::GAMEMODE_UPSELL, .mChallengeIconIndex = 10, .mPage = ChallengePage::CHALLENGE_PAGE_LIMBO, .mRow = 3, .mCol = 4, .mChallengeName = "Upsell" },
 	{ .mChallengeMode = GameMode::GAMEMODE_INTRO, .mChallengeIconIndex = 10, .mPage = ChallengePage::CHALLENGE_PAGE_LIMBO, .mRow = 2, .mCol = 3, .mChallengeName = "Intro" }
 };
