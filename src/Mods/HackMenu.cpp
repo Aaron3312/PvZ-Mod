@@ -1,6 +1,7 @@
 #include <SDL.h>
 #include "HackMenu.h"
 #include "VersusNet.h"
+#include "ARView.h"
 #include "Mods.h"
 #include "LawnApp.h"
 #include "Lawn/Board.h"
@@ -148,7 +149,7 @@ namespace
 		const ImGuiContext& g = *ImGui::GetCurrentContext();
 		ImVec2 aPos(static_cast<float>(theX), static_cast<float>(theY));
 		for (const ImGuiWindow* aWindow : g.Windows)
-			if (aWindow->Active && !aWindow->Hidden && aWindow->Rect().Contains(aPos))
+			if (aWindow->Active && !aWindow->Hidden && !(aWindow->Flags & ImGuiWindowFlags_NoMouseInputs) && aWindow->Rect().Contains(aPos))
 				return true;
 		return false;
 	}
@@ -299,10 +300,32 @@ namespace
 			ImGui::EndDisabled();
 		}
 
+		if (ImGui::CollapsingHeader("Ver en AR", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			aChanged |= ImGui::Checkbox("Ver en AR desde el celular", &s.mARView);
+			ImGui::SetItemTooltip("El juego en una mesa de verdad, con Chrome de Android (pagina /ar)");
+			std::string aHint = ARView::HintText();
+			if (!aHint.empty())
+				ImGui::TextWrapped("%s", aHint.c_str());
+		}
+
 		ImGui::PopItemWidth();
 		if (aChanged)
 			Mods::Save(gLawnApp);
 
+		ImGui::End();
+	}
+
+	// Where to open the AR page, at the bottom of the screen until the phone connects. Drawn after the
+	// capture, so the phone doesn't see it, and without inputs, so it never takes a click.
+	void DrawARHint(const std::string& theText)
+	{
+		const ImGuiIO& io = ImGui::GetIO();
+		ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y - 6 * gScale), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+		ImGui::SetNextWindowBgAlpha(0.8f);
+		ImGui::Begin("##arhint", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize |
+			ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav);
+		ImGui::TextUnformatted(theText.c_str());
 		ImGui::End();
 	}
 }
@@ -365,6 +388,7 @@ void HackMenu::RequestScreenshot(const char* thePngPath)
 void HackMenu::Render()
 {
 	VersusNet::OnFrame();	// before the menu is drawn, so the other computer doesn't see it
+	ARView::OnFrame();
 
 	if (!gScreenshotPath.empty() && gLawnApp && gLawnApp->mWindow)
 	{
@@ -375,13 +399,24 @@ void HackMenu::Render()
 	// The first frame creates the context and loads the saved mods, menu open or not.
 	if (!gReady && !EnsureReady())
 		return;
-	if (!gOpen)
+	std::string aARHint = ARView::HasViewer() ? "" : ARView::HintText();
+	if (!gOpen && aARHint.empty())
 		return;
 
+	// Only the hint on screen: leave the game's cursor alone
+	ImGuiIO& io = ImGui::GetIO();
+	bool aKeepCursor = !gOpen && !(io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange);
+	if (aKeepCursor)
+		io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplSDL2_NewFrame();
+	if (aKeepCursor)
+		io.ConfigFlags &= ~ImGuiConfigFlags_NoMouseCursorChange;
 	ImGui::NewFrame();
-	DrawMenu();
+	if (gOpen)
+		DrawMenu();
+	if (!aARHint.empty())
+		DrawARHint(aARHint);
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 

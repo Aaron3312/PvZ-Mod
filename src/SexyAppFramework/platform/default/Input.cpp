@@ -33,6 +33,7 @@
 #include "misc/KeyCodes.h"
 #ifdef PVZ_HACK_MENU
 #include "Mods/HackMenu.h"
+#include "Mods/ARView.h"
 #endif
 
 #ifdef __EMSCRIPTEN__
@@ -588,6 +589,12 @@ bool SexyAppBase::ProcessDeferredMessages(bool singleMessage)
 		while (WasmPopSoftKeyboardKey() != 0) {} // discard queued soft-keyboard input during playback
 		while (WasmPopSoftKeyboardChar() != 0) {}
 	}
+#endif
+
+#ifdef PVZ_HACK_MENU
+	// Taps from the AR view (Mods/ARView.cpp), one per call like the SDL events below
+	if (!mPlayingDemoBuffer && ARView::DispatchMouse())
+		return true;
 #endif
 
 	SDL_Event event;
