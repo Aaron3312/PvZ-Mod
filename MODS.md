@@ -49,23 +49,57 @@ En **Minijuegos**, botón **Mods** abajo a la derecha. Siempre desbloqueados; lo
 | Gigantes | Día | Cada zombi 1,4 veces más grande, con el doble de vida y algo más lento |
 | Cinta mod | Día | Sin elegir semillas: la cinta trae plantas mod y algunas normales |
 | Caos en la piscina | Piscina | Los zombis de la segunda tanda, con flotadores y delfines |
-| Versus | Día | Dos jugadores: uno pone plantas y el otro manda los zombis (ver abajo) |
+| Versus Día, Noche, Piscina, Niebla y Tejado | Uno cada uno | Dos jugadores: uno pone plantas y el otro manda los zombis (ver abajo) |
 
 ### Versus
 
-No hay oleadas: cada zombi lo manda el jugador zombi, que gasta **cerebros**. Empieza con 50 y gana 25 cada 3 s. Los primeros 15 s no se puede mandar nada, para que las plantas arranquen. Los zombis ganan si uno llega a la casa; las plantas, si aguantan 3 minutos. Las reglas y la lista de zombis (Normal 50, Cono 75, Cubo 125, Pértiga 75, Veloz 75, Divisor 100, Kamikaze 100, Médico 125, Fútbol 175) están en `src/Mods/Versus.cpp`.
+Cinco modos, uno por escenario, en la segunda fila de la página Mods. No hay oleadas: cada zombi lo manda el jugador zombi, que paga con **cerebros**. Las reglas, los números y las listas de zombis están arriba de todo en `src/Mods/Versus.{h,cpp}`.
 
-- **En el mismo equipo:** las plantas con el ratón; los zombis con W/S o las flechas (carril) y 1-9 (zombi).
-- **Desde otro aparato:** mientras haya una partida versus, el juego sirve una página en el puerto 8090 (`src/Mods/VersusNet.cpp`). La dirección sale arriba de la barra del juego y lleva un código de 6 letras; sin él no deja pasar. La página muestra el juego en vivo (JPEG, unas 11 imágenes por segundo) y manda las mismas teclas, con botones para el dedo. Basta un navegador: otra Mac, un Android o un iPhone.
+**La partida** dura 8 minutos en tres fases, con un letrero al cambiar:
+
+| Fase | Desde | Cerebros cada 3 s | Qué se desbloquea |
+|---|---|---|---|
+| 1. Avanzada | 0:00 (los primeros 20 s no se manda nada) | 25 | Los zombis ligeros |
+| 2. Asedio | 2:24 | 35 | Fútbol, Zomboni, globo, minero, catapulta, la zombotánica fuerte y casi todos los mod |
+| 3. Ola final | 5:36 | 50 | Los pesados: Gargantúa, Ojos rojos, Gigante, Bailarín, Nuez alta y la Oleada |
+
+El jugador zombi empieza con 75 cerebros. Cada zombi tiene su propia recarga, como los sobres de semillas.
+
+**Objetivos.** En cada carril hay un cerebro junto a la casa. Primero actúa la podadora, como siempre; cuando un zombi llega a la casa por un carril sin podadora, se come el cerebro de ese carril (o el más cercano que quede) y desaparece. Los zombis ganan al comerse **3 cerebros**; las plantas, si el reloj llega a cero antes. Además:
+
+- Cada planta que se comen los zombis le da al jugador zombi un cuarto de su precio en cerebros (entre 10 y 50).
+- Matar un zombi de 150 cerebros o más suelta sol para las plantas (un cuarto de su precio, en soles de 25).
+- **Noche:** con T el jugador zombi cambia a «desde la tumba»: el zombi sale de la tumba más cercana a la casa de su carril, por 1,5 veces el precio y con 8 s entre una y otra. Solo los zombis que caminan (normales, cono, cubo, periódico, puerta, fútbol y los mod). Cada tumba que las plantas rompen con la Grave Buster les da 75 de sol.
+- **La Oleada** (el abanderado) trae además un zombi en cada uno de los otros carriles.
+- **Puenting** se lleva una planta del carril elegido.
+
+Al final sale un letrero con quién ganó y el resumen: zombis mandados, zombis matados, plantas comidas, cerebros comidos y tiempo. Si ganan las plantas, cae el trofeo; si ganan los zombis, el resumen sale en el cuadro de fin de partida, con «Try again» para la revancha.
+
+**Escenarios y zombis.** Cada uno trae los zombis que el juego usa en ese tipo de nivel, los mod y unos pesados para el final, en páginas de hasta nueve:
+
+| Escenario | Páginas | Qué tiene de especial |
+|---|---|---|
+| Día | Clásicos, Zombotánica, Pesados, Mod | Los zombis con cabeza de planta de «Guisantes en guerra» |
+| Noche | Clásicos, Pesados, Mod | Tumbas, sin sol del cielo (las plantas empiezan con 150); el Bailarín |
+| Piscina | Clásicos, Piscina, Pesados, Mod | En los dos carriles de agua solo entran los que nadan: Normal, Cono y Cubo (con flotador), la Oleada, el Buceador y el Delfín; los demás salen apagados con una X. El Bobsleigh necesita el hielo de un Zomboni |
+| Niebla | Clásicos, Niebla, Pesados, Mod | Niebla desde la columna 6, agua como en la piscina (el Globo vuela por encima), sin sol del cielo (empiezan con 200); caja sorpresa, globo, minero, saltarín |
+| Tejado | Clásicos, Tejado, Pesados, Mod | Macetas en las tres primeras columnas, sin minero; puenting, escalera, catapulta, diablillo y Gargantúa de ojos rojos |
+
+- **Clásicos:** Normal, Cono, Cubo, Pértiga, Periódico y Puerta (según el escenario) y la Oleada.
+- **Pesados:** Fútbol, Gargantúa (Ojos rojos en el tejado), Gigante (el caracubo gigante) y el Bailarín de noche.
+- **Mod:** Veloz, Saltacarril, Fantasma, Hielo, Divisor, Kamikaze y Médico.
+- **No salen solos:** el bailarín de apoyo, el zombi con flotador y el minizombi llegan con otro (el Bailarín, cualquier zombi que entra al agua y el Divisor). Tampoco están el Yeti, que se va solo a los 15-20 s y suelta diamantes, ni el Dr. Zomboss, que necesita su propio escenario y su guion.
+
+**Teclas del jugador zombi:** W/S o las flechas eligen el carril (resaltado a la derecha), Q/E cambian de página, 1-9 mandan el zombi de esa casilla y T, de noche, alterna la tumba. La barra de abajo muestra los cerebros, el carril, los sobres de la página (retrato, nombre, precio y recarga; «F2»/«F3» si aún no toca, «X» si no puede ir por ese carril), la fase, el reloj y los cerebros comidos.
+
+**Trucos.** Mientras dura un versus se ignoran todos los trucos que inclinan la partida (sol infinito, sin recarga, precio, plantar sin reglas, plantas invencibles, daño, matar de un golpe, vida de los zombis y zombis congelados) y los botones de un solo uso; solo cuenta la velocidad. El ajuste guardado no cambia. Si alguno está encendido, la partida avisa «Trucos en pausa en Versus».
+
+- **En el mismo equipo:** las plantas con el ratón; los zombis con el teclado.
+- **Desde otro aparato:** mientras haya una partida versus, el juego sirve una página en el puerto 8090 (`src/Mods/VersusNet.cpp`). La dirección sale arriba de la barra del juego y lleva un código de 6 letras; sin él no deja pasar. La página muestra el juego en vivo (JPEG, unas 11 imágenes por segundo) y debajo todos los zombis del escenario, agrupados por página, con su precio y su recarga; los que no se pueden mandar salen apagados con el motivo. Los carriles se eligen tocando su número (azul: agua; tachado: ya sin cerebro; con punto morado: tumba). Basta un navegador: otra Mac, un Android o un iPhone.
+  - `/state?c=<código>` devuelve el estado en JSON (cerebros, fase, reloj, carril, cerebros comidos, cada zombi con su precio y recarga, y el resumen al final).
+  - `/cmd?c=<código>&k=<tecla>` manda una tecla, `&z=<n>` el zombi n de la lista y `&l=<fila>` elige el carril.
 - **Desde otra red:** si **Tailscale Funnel** está activado en el tailnet, el juego publica además `https://<equipo>.<tailnet>.ts.net/?c=<código>` (`tailscale funnel --bg 8090`) y lo apaga al salir del versus. `PVZ_VERSUS_FUNNEL=0` lo desactiva. En Android no hay Funnel: el teléfono se alcanza por su dirección local o la de Tailscale.
 - La partida versus no se guarda a medias.
-
-**Cómo están hechos:** cada uno es una variante de un original y comparte su código, a través de `ModContent::BaseSeedType` y `ModContent::BaseZombieType`. Sus valores van al final de `SeedType` y `ZombieType`, así que los originales conservan los suyos. Los nombres y textos del almanaque están en `src/Mods/ModContent.cpp`.
-
-**Sprites:** hay dos maneras de recolorear.
-
-- **Nueces** (Hielonuez, Nuez tiradora, Nuez espinosa): imágenes que genera `scripts/make-mod-art.py` a partir de tus datos del juego. No se guardan en el repo porque derivan del arte de EA. El juego las busca en `<ejecutable>/mods` o en `Contents/Resources/mods`, y `make-macos-app.sh` las genera solo. Si faltan, se usa un tinte.
-- **Lanzafuego, Lanzaveneno, Girasol sanador y Cereza de hielo:** filtros que cambian un tono por otro al vuelo (`FilterEffectDoHueMap` en `src/PvzpLib/FilterEffect.cpp`, el mismo sistema que blanquea a la Imitadora). Teñir no basta: una planta verde teñida de morado solo se oscurece. Cada planta tiene su filtro en `ModContent::PlantFilter`, que se aplica a sus animaciones y al dibujo de su sobre. El guisante venenoso usa el mismo filtro morado.
 
 **Probarlo sin ratón y sin sonido:**
 
@@ -76,7 +110,13 @@ SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy PVZ_MOD_TEST=1 PVZ_MOD_TEST_SHOTS=/
 
 - `PVZ_MOD_TEST=1` entra en un nivel, planta las plantas nuevas junto a un lanzaguisantes normal y suelta tres de cada zombi nuevo.
 - Cada 2 s escribe en el log los zombis (tipo, fila, posición, velocidad, vida, frío, congelación, veneno y escala), cuántos proyectiles hay de cada tipo y cuántas plantas siguen vivas y heridas.
-- `=modes` abre la página Mods de los minijuegos y `=mode1`…`=mode5` juega ese modo y suelta dos de cada zombi que permite. `=mode6` es el versus: con `PVZ_MOD_TEST_VERSUS=1` planta una defensa y juega el lado zombi (y no hace caso al teclado de verdad), `PVZ_MOD_TEST_VERSUS_SECONDS` acorta la partida y `PVZ_VERSUS_CODE` fija el código para probar la página con curl (`/stream`, `/cmd?k=49`).
+- `=modes` abre la página Mods de los minijuegos y `=mode1`…`=mode5` juega ese modo y suelta dos de cada zombi que permite.
+- `=mode6`…`=mode10` son los versus de Día, Noche, Piscina, Niebla y Tejado. Con `PVZ_MOD_TEST_VERSUS=1` la prueba planta una defensa válida para el escenario (nenúfares en el agua, macetas en el tejado, setas de noche) y juega el lado zombi con las mismas teclas (y no hace caso al teclado de verdad): recorre la lista página a página, ahorra para cada zombi, busca un carril donde pueda ir y de noche saca uno de cada cinco desde una tumba.
+  - `PVZ_MOD_TEST_VERSUS_DEFENSE=debil|normal|fuerte`: con la débil ganan los zombis; con la normal se suelen comer algún cerebro y la partida llega a la ola final; con la fuerte aguantan las plantas.
+  - `PVZ_MOD_TEST_VERSUS_SECONDS` acorta la partida (las fases mantienen su parte), `PVZ_MOD_TEST_SPEED=<1-10>` la juega más rápido y `PVZ_MOD_TEST_VERSUS_SHOTS=<ticks>` guarda una captura cada tantos tics. La primera vez que manda de cada página guarda `versus-<escenario>-page<n>.png`.
+  - `PVZ_MOD_TEST_CHEATS=1` enciende en memoria los trucos que el versus debe ignorar, para comprobar que los zombis no salen congelados.
+  - `PVZ_VERSUS_CODE` fija el código para probar la página con curl (`/stream`, `/state`, `/cmd?k=49`, `/cmd?z=0`, `/cmd?l=1`).
+- `PVZ_TEST_HIDDEN_WINDOW=1` crea la ventana oculta (en la Mac no hay contexto GL sin ventana) y `SDL_MAC_BACKGROUND_APP=1` evita que la prueba le quite el foco a quien esté usando la Mac.
 - `=chooser` se queda en la página Mods del selector.
 - `PVZ_MOD_TEST_SHOTS` hace que el propio juego guarde capturas, así nunca se captura el escritorio.
 
