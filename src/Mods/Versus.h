@@ -40,9 +40,9 @@ namespace ModVersus
 	constexpr int	GRAVE_RECHARGE = 500;				// between two rises
 	constexpr int	GRAVE_BUSTED_SUN = 75;				// night: sun for the plants for each grave they clear
 	constexpr int	WIN_PAUSE_TICKS = 350;				// the zombies' win shows on the lawn before the game-over dialog
-	constexpr int	PAGE_SIZE = 9;
+	constexpr int	PAGE_SLOTS = 9;
 	constexpr int	MAX_PAGES = 4;
-	constexpr int	MAX_ROSTER = PAGE_SIZE * MAX_PAGES;
+	constexpr int	MAX_ROSTER = PAGE_SLOTS * MAX_PAGES;
 
 	// Commands from the other device that aren't keys (VersusNet's /cmd?z= and ?l=)
 	constexpr int	NET_SEND = 0x10000;					// + roster index

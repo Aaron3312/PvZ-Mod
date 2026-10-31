@@ -76,7 +76,7 @@ namespace ModVersus
 		{
 			const char*	mName;
 			int			mCount;
-			ZombieType	mTypes[PAGE_SIZE];
+			ZombieType	mTypes[PAGE_SLOTS];
 		};
 
 		struct StageDef
