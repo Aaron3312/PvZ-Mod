@@ -316,6 +316,7 @@ async function runAR(session){
 	reticle.matrixAutoUpdate=false;reticle.visible=false;scene.add(reticle);
 
 	const st={mode:'place',tilt:0,rot:0,yaw:0,width:board.width,placed:false};
+	window.__ar={T,root,screen,reticle,scene,camera,renderer,st,get ref(){return ref;},get eye(){return eye;},get anchor(){return anchor;}};	// for remote debugging
 	function layout(){
 		board.layout(st);
 		$('tiltv').textContent=st.tilt+' grados';
@@ -346,6 +347,9 @@ async function runAR(session){
 	for(const el of [$('top'),$('controls')])el.addEventListener('beforexrselect',e=>e.preventDefault());
 	layout();setMode('place');
 
+	// Chrome on Android has WebXR Layers now, and three r160 then draws into a projection layer that the
+	// AR compositor never shows. Hiding them makes three use the classic XRWebGLLayer, like Google's samples.
+	try{Object.defineProperty(XRRenderState.prototype,'layers',{get(){return undefined;},configurable:true});}catch(e){}
 	await renderer.xr.setSession(session);
 	ref=renderer.xr.getReferenceSpace();
 	hitSource=await session.requestHitTestSource({space:await session.requestReferenceSpace('viewer')});
