@@ -298,7 +298,9 @@ namespace
 			ImGui::BeginDisabled(!IsPlaying() || aVersus);
 			if (ImGui::Button("Ganar el nivel"))
 				WinLevel();
+			ImGui::EndDisabled();
 			ImGui::SameLine();
+			ImGui::BeginDisabled(!IsPlaying());
 			if (ImGui::Button("Elegir nivel..."))
 				gLawnApp->DoCheatDialog();
 			ImGui::EndDisabled();
