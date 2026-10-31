@@ -194,6 +194,8 @@ namespace
 	const Board*		gBackdropBoard = nullptr;
 	int					gBackdropType = -1;
 	std::unique_ptr<GLImage> gCanvas;				// a big destination, so figures drawn at the probe aren't clipped
+	int					gAtlasHeight = 0;			// grows at once, shrinks after a while: the phone reallocates its texture
+	uint32_t			gAtlasShrinkSince = 0;
 
 	// Measured for the log while someone watches
 	std::atomic<uint32_t> gStatScenes{ 0 };
@@ -867,11 +869,12 @@ namespace
 		gEncodeCond.notify_one();
 	}
 
-	// The lawn the diorama can show: in play, no dialog over it, one of the five outdoor backgrounds, no boss.
+	// The lawn the diorama can show: in play, no dialog over it, one of the five outdoor backgrounds, no boss. Not
+	// in fog yet: the diorama has no fog, so it would show the zombies the fog hides.
 	Board* SceneBoard()
 	{
 		Board* aBoard = gLawnApp->mBoard;
-		if (!aBoard || gLawnApp->mGameScene != GameScenes::SCENE_PLAYING || gLawnApp->GetDialogCount() > 0)
+		if (!aBoard || gLawnApp->mGameScene != GameScenes::SCENE_PLAYING || gLawnApp->GetDialogCount() > 0 || aBoard->StageHasFog())
 			return nullptr;
 		if (aBoard->mBackground < BackgroundType::BACKGROUND_1_DAY || aBoard->mBackground > BackgroundType::BACKGROUND_5_ROOF)
 			return nullptr;
@@ -1270,11 +1273,24 @@ namespace
 		}
 		if (aPainter.mSkipped > 0)
 			PvzpLogLn("ARView: the atlas is full, {} figures left out", aPainter.mSkipped);
+		int aUsed = aPainter.UsedHeight();
+		if (aUsed >= gAtlasHeight)
+		{
+			gAtlasHeight = aUsed;
+			gAtlasShrinkSince = 0;
+		}
+		else if (gAtlasShrinkSince == 0)
+			gAtlasShrinkSince = std::max<uint32_t>(1, theNow);
+		else if (theNow - gAtlasShrinkSince >= 3000)
+		{
+			gAtlasHeight = aUsed;
+			gAtlasShrinkSince = 0;
+		}
 		theJson = std::format("{{\"t\":{},\"aw\":{},\"ah\":{},\"bg\":{},\"bgx\":{},\"bgw\":{},\"bgh\":{},\"bt\":{},\"lanes\":[{}],\"water\":[{}],"
 			"\"hud\":{},\"meter\":{},\"msg\":{},\"o\":[{}]}}",
-			theNow, ATLAS_WIDTH, aPainter.UsedHeight(), gBackdropSerial, -BOARD_OFFSET, BACKDROP_WIDTH, BACKDROP_HEIGHT, static_cast<int>(theBoard->mBackground),
+			theNow, ATLAS_WIDTH, gAtlasHeight, gBackdropSerial, -BOARD_OFFSET, BACKDROP_WIDTH, BACKDROP_HEIGHT, static_cast<int>(theBoard->mBackground),
 			aLanes, aWater, aHasHud ? PanelJson(aHud) : "null", aHasMeter ? PanelJson(aMeter) : "null", aHasMessage ? PanelJson(aMessage) : "null", aObjects);
-		return aPainter.UsedHeight();
+		return gAtlasHeight;
 	}
 
 	void Scene(uint32_t theNow)

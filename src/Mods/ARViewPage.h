@@ -421,6 +421,8 @@ function buildDiorama(T,gw,gh){
 		if(atlas.image&&atlas.image!==atlasImage)retired.push(atlas.image);
 		if(backdropImage){if(bgTex.image&&bgTex.image!==backdropImage)retired.push(bgTex.image);bgTex.image=backdropImage;bgTex.needsUpdate=true;}
 		if(js.bt!==bt||js.bgx!==bgx){bt=js.bt;bgx=js.bgx;bgw=js.bgw;bgh=js.bgh;lawn=lawnLayout(bt,gw,gh);rebuild();}
+		// three keeps a texture's first size (texStorage2D): a new size needs a new texture
+		if(atlas.image&&(atlas.image.width!==atlasImage.width||atlas.image.height!==atlasImage.height))atlas.dispose();
 		atlas.image=atlasImage;atlas.needsUpdate=true;
 		aw=js.aw;ah=js.ah;scene=js;
 		hud=js.hud;
@@ -442,7 +444,8 @@ function buildDiorama(T,gw,gh){
 			group.matrixWorld.decompose(v1,qg,v2);
 			message.quaternion.copy(q.copy(qg).invert().multiply(camQuat));
 		}
-		shown=sortFar(tracks.shown(now,gw,gh),cam);
+		// only what stands on the base: zombies wait on the street out of sight, as off the game's screen
+		shown=sortFar(tracks.shown(now,gw,gh).filter(s=>s.x+gw/2>=lawn.x0-30&&s.x+gw/2<=lawn.x1+10),cam);
 		const n=Math.min(MAXI,shown.length),U=1/(2*aw),V=1/ah;
 		const F=iFeet.array,Bx=iBox.array,Uv=iUv.array,Sh=iShadow.array;
 		let ns=0;
