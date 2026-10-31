@@ -223,6 +223,18 @@ namespace
 			static const int sVersusShots = SDL_getenv("PVZ_MOD_TEST_VERSUS_SHOTS") ? SDL_atoi(SDL_getenv("PVZ_MOD_TEST_VERSUS_SHOTS")) : 0;
 			if (sVersusShots > 0 && theApp->mBoard && ModVersus::IsVersus(theApp->mGameMode) && sTicks % sVersusShots == 0)
 				TestScreenshot(std::format("mode{}-t{:05}", TestModeNumber(), sTicks).c_str());
+			// A versus test saves the end (the summary, then the game-over dialog or the trophy) and closes the game.
+			if (theApp->mBoard && ModVersus::IsVersus(theApp->mGameMode) && ModVersus::GetWinner() != 0 && SDL_getenv("PVZ_MOD_TEST_VERSUS"))
+			{
+				static int sOverTicks = 0;
+				sOverTicks++;
+				if (sOverTicks == 150)
+					TestScreenshot(std::format("mode{}-end", TestModeNumber()).c_str());
+				if (sOverTicks == 700)
+					TestScreenshot(std::format("mode{}-end2", TestModeNumber()).c_str());
+				if (sOverTicks == 750)
+					theApp->Shutdown();
+			}
 			// PVZ_MOD_TEST_SAVELOAD: at 10 s, save, throw the board away and load it again (what "Continue" does),
 			// to check that the mod fields survive a saved game. The file goes next to the screenshots.
 			static const bool sSaveLoad = SDL_getenv("PVZ_MOD_TEST_SAVELOAD") != nullptr && SDL_getenv("PVZ_MOD_TEST_SHOTS") != nullptr;

@@ -37,7 +37,7 @@ namespace ModVersus
 	constexpr int	KILL_REWARD_MIN_COST = 150;			// sun for the plants when they kill a zombie this expensive...
 	constexpr int	KILL_REWARD_PERCENT = 25;			// ...this share of its cost, in 25-sun drops
 	constexpr int	GRAVE_COST_PERCENT = 150;			// night: rising from a grave costs this much of the price
-	constexpr int	GRAVE_RECHARGE = 500;				// between two rises
+	constexpr int	GRAVE_RECHARGE = 800;				// between two rises
 	constexpr int	GRAVE_BUSTED_SUN = 75;				// night: sun for the plants for each grave they clear
 	constexpr int	WIN_PAUSE_TICKS = 350;				// the zombies' win shows on the lawn before the game-over dialog
 	constexpr int	PAGE_SLOTS = 9;
@@ -98,6 +98,7 @@ namespace ModVersus
 	SendCheck CanSend(Board* theBoard, int theIndex);
 	int		GetBrains();
 	int		GetLane();
+	int		GetWinner();								// 0 while playing, 1 plants, 2 zombies
 }
 
 #endif

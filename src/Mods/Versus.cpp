@@ -39,7 +39,7 @@ namespace ModVersus
 			{ ZombieType::ZOMBIE_FLAG, 300, 6000, 2, "Oleada" },		// the flag zombie brings one zombie in every other lane
 			{ ZombieType::ZOMBIE_FOOTBALL, 175, 1500, 1, "Futbol" },
 			{ ZombieType::ZOMBIE_DANCER, 300, 3000, 2, "Bailarin" },
-			{ ZombieType::ZOMBIE_SNORKEL, 75, 700, 0, "Buceador" },
+			{ ZombieType::ZOMBIE_SNORKEL, 100, 800, 0, "Buceador" },	// only hittable when it comes up to eat
 			{ ZombieType::ZOMBIE_DOLPHIN_RIDER, 125, 1000, 0, "Delfin" },
 			{ ZombieType::ZOMBIE_ZAMBONI, 175, 2000, 1, "Zomboni" },
 			{ ZombieType::ZOMBIE_BOBSLED, 100, 1200, 1, "Bobsleigh" },	// needs the ice a Zomboni leaves
@@ -90,23 +90,24 @@ namespace ModVersus
 		constexpr PageDef MOD_PAGE = { "Mod", 7, { ZOMBIE_SPEEDY, ZOMBIE_HOPPER, ZOMBIE_GHOST, ZOMBIE_ICE, ZOMBIE_SPLITTER, ZOMBIE_KAMIKAZE, ZOMBIE_HEALER } };
 
 		// One per versus mode, in GameMode order: the zombies the game uses on that kind of level, the mod ones and a
-		// few heavies for the last phase.
+		// few heavies for the last phase. The plants start with more sun where no sun falls (night, fog) and where they
+		// have six lanes to cover (pool, fog).
 		constexpr StageDef STAGES[] = {
 			{ "Dia", 50, 4, {
 				{ "Clasicos", 7, { ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_DOOR, ZOMBIE_FLAG } },
 				{ "Zombotanica", 6, { ZOMBIE_PEA_HEAD, ZOMBIE_WALLNUT_HEAD, ZOMBIE_JALAPENO_HEAD, ZOMBIE_GATLING_HEAD, ZOMBIE_SQUASH_HEAD, ZOMBIE_TALLNUT_HEAD } },
 				{ "Pesados", 3, { ZOMBIE_FOOTBALL, ZOMBIE_GARGANTUAR, ZOMBIE_GIANT_PAIL } },
 				MOD_PAGE } },
-			{ "Noche", 100, 3, {
+			{ "Noche", 150, 3, {
 				{ "Clasicos", 7, { ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_DOOR, ZOMBIE_FLAG } },
 				{ "Pesados", 4, { ZOMBIE_FOOTBALL, ZOMBIE_DANCER, ZOMBIE_GARGANTUAR, ZOMBIE_GIANT_PAIL } },
 				MOD_PAGE } },
-			{ "Piscina", 50, 4, {
+			{ "Piscina", 100, 4, {
 				{ "Clasicos", 6, { ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_FLAG } },
 				{ "Piscina", 4, { ZOMBIE_SNORKEL, ZOMBIE_DOLPHIN_RIDER, ZOMBIE_ZAMBONI, ZOMBIE_BOBSLED } },
 				{ "Pesados", 3, { ZOMBIE_FOOTBALL, ZOMBIE_GARGANTUAR, ZOMBIE_GIANT_PAIL } },
 				MOD_PAGE } },
-			{ "Niebla", 100, 4, {
+			{ "Niebla", 200, 4, {
 				{ "Clasicos", 4, { ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FLAG } },
 				{ "Niebla", 6, { ZOMBIE_JACK_IN_THE_BOX, ZOMBIE_BALLOON, ZOMBIE_DIGGER, ZOMBIE_POGO, ZOMBIE_DOLPHIN_RIDER, ZOMBIE_SNORKEL } },
 				{ "Pesados", 3, { ZOMBIE_FOOTBALL, ZOMBIE_GARGANTUAR, ZOMBIE_GIANT_PAIL } },
@@ -592,7 +593,7 @@ namespace ModVersus
 			int aDefense = TestDefense();
 			SeedType aSun = aNight ? SeedType::SEED_SUNSHROOM : SeedType::SEED_SUNFLOWER;
 			SeedType aShooter = aRoof ? SeedType::SEED_CABBAGEPULT : aNight ? SeedType::SEED_FUMESHROOM : SeedType::SEED_PEASHOOTER;
-			SeedType aStrong = aRoof ? SeedType::SEED_MELONPULT : aNight ? SeedType::SEED_GLOOMSHROOM : SeedType::SEED_REPEATER;
+			SeedType aStrong = aRoof ? SeedType::SEED_MELONPULT : aNight ? SeedType::SEED_FUMESHROOM : SeedType::SEED_REPEATER;
 			for (int aRow = 0; aRow < MAX_GRID_SIZE_Y; aRow++)
 			{
 				if (!IsLane(theBoard, aRow))
@@ -606,13 +607,17 @@ namespace ModVersus
 				}
 				TestPlant(theBoard, 1, aRow, aShooter);
 				TestPlant(theBoard, 2, aRow, aDefense == 2 ? aStrong : aShooter);
-				TestPlant(theBoard, 3, aRow, aRoof || aDefense == 2 ? SeedType::SEED_TALLNUT : SeedType::SEED_WALLNUT);
+				TestPlant(theBoard, 3, aRow, aDefense == 2 ? SeedType::SEED_TALLNUT : SeedType::SEED_WALLNUT);
 				if (aDefense == 2)
 				{
-					TestPlant(theBoard, 4, aRow, aRoof ? aStrong : SeedType::SEED_SNOWPEA);
+					TestPlant(theBoard, 4, aRow, aRoof ? aStrong : aNight ? SeedType::SEED_PUFFSHROOM : SeedType::SEED_SNOWPEA);
 					TestPlant(theBoard, 5, aRow, SeedType::SEED_SPIKEWEED);
+					// Gloom-shrooms go on top of fume-shrooms
 					if (aNight)
-						TestPlant(theBoard, 1, aRow, SeedType::SEED_PLANTERN);
+					{
+						TestPlant(theBoard, 1, aRow, SeedType::SEED_GLOOMSHROOM);
+						TestPlant(theBoard, 2, aRow, SeedType::SEED_GLOOMSHROOM);
+					}
 				}
 			}
 			// Something against balloons and the fog
@@ -623,6 +628,12 @@ namespace ModVersus
 			}
 			if (theBoard->StageHasFog())
 				TestPlant(theBoard, 2, 2, SeedType::SEED_PLANTERN);
+			// Night: a Grave Buster on the first grave of the top lane, for the grave bonus
+			if (aDefense > 0 && StageHasGraves(theBoard))
+			{
+				if (GridItem* aGrave = GraveInLane(theBoard, 0))
+					theBoard->AddPlant(aGrave->mGridX, 0, SeedType::SEED_GRAVEBUSTER);
+			}
 			int aPlants = 0;
 			for (Plant* aPlant : theBoard->mPlants)
 				aPlants += !aPlant->mDead;
@@ -988,6 +999,11 @@ namespace ModVersus
 	int GetLane()
 	{
 		return sLane;
+	}
+
+	int GetWinner()
+	{
+		return static_cast<int>(sWinner);
 	}
 
 	void AllowZombies(GameMode theGameMode, bool* theAllowed)
