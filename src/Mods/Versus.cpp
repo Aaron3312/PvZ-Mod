@@ -14,7 +14,9 @@
 #include "PvzpLib/PvzpCommon.h"
 #include "PvzpLib/PvzpDebug.h"
 #include "PvzpLib/PvzpFoley.h"
+#include "graphics/Font.h"
 #include "graphics/Graphics.h"
+#include "misc/SexyMatrix.h"
 #include "misc/KeyCodes.h"
 #include <SDL.h>
 #include <algorithm>
@@ -179,6 +181,7 @@ namespace ModVersus
 		int			sSunBonus = 0;
 		std::string	sMessage;
 		int			sMessageTick = -MESSAGE_TICKS;
+		int			sMessageTicks = MESSAGE_TICKS;
 		FloatText	sFloatTexts[MAX_FLOAT_TEXTS];
 		int			sNumFloatTexts = 0;
 		int			sGraveCells[MAX_GRAVES][2];
@@ -303,10 +306,11 @@ namespace ModVersus
 			return aCost;
 		}
 
-		void ShowMessage(Board* theBoard, const std::string& theMessage)
+		void ShowMessage(Board* theBoard, const std::string& theMessage, int theTicks = MESSAGE_TICKS)
 		{
 			sMessage = theMessage;
 			sMessageTick = theBoard->mMainCounter;
+			sMessageTicks = theTicks;
 		}
 
 		void AddFloatText(Board* theBoard, int theX, int theY, const Color& theColor, const std::string& theText)
@@ -821,6 +825,19 @@ namespace ModVersus
 			PvzpDrawString(g, theText, theX, theY, theFont, theColor, theJustification);
 		}
 
+		// Small text squeezed to fit theWidth, centered on theX, with a shadow (the zombie names on the packets)
+		void DrawFittedText(Graphics* g, const std::string& theText, float theX, float theY, float theWidth, _Font* theFont, const Color& theColor)
+		{
+			float aWidth = static_cast<float>(theFont->StringWidth(theText));
+			float aScale = aWidth > theWidth ? theWidth / aWidth : 1.0f;
+			for (int aShadow = 1; aShadow >= 0; aShadow--)
+			{
+				SexyMatrix3 aMatrix;
+				PvzpScaleTransformMatrix(aMatrix, theX - aWidth * aScale / 2 + aShadow, theY + aShadow, aScale, 1.0f);
+				PvzpDrawStringMatrix(g, theFont, aMatrix, theText, aShadow ? Color(0, 0, 0, theColor.mAlpha) : theColor);
+			}
+		}
+
 		void DrawBrainIcon(Graphics* g, float theX, float theY, float theScale, bool theEaten)
 		{
 			if (theEaten)
@@ -876,10 +893,13 @@ namespace ModVersus
 				Color aCostColor = sBrains >= aCost ? Color(0, 0, 0) : Color(190, 0, 0);
 				PvzpDrawString(g, std::to_string(aCost), aX + 34, aY + 50, Sexy::FONT_PICO129, aCostColor, DrawStringJustification::DS_ALIGN_RIGHT);
 				DrawTextShadow(g, std::to_string(i + 1), aX + 3, aY + 11, Sexy::FONT_BRIANNETOD12, Color(255, 255, 255), DrawStringJustification::DS_ALIGN_LEFT);
+				g->SetColor(Color(0, 0, 0, 120));
+				g->FillRect(aX + 2, aY + 35, 34, 9);
+				DrawFittedText(g, aSlot.mEntry->mName, aX + 19, aY + 43, 34, Sexy::FONT_PICO129, aGray == 255 ? Color(255, 255, 255) : Color(190, 190, 190));
 				if (aCheck == SendCheck::LOCKED)
-					DrawTextShadow(g, std::format("F{}", aSlot.mEntry->mPhase + 1), aX + 19, aY + 33, Sexy::FONT_HOUSEOFTERROR16, Color(255, 200, 80), DrawStringJustification::DS_ALIGN_CENTER);
+					DrawTextShadow(g, std::format("F{}", aSlot.mEntry->mPhase + 1), aX + 19, aY + 30, Sexy::FONT_HOUSEOFTERROR16, Color(255, 200, 80), DrawStringJustification::DS_ALIGN_CENTER);
 				else if (aCheck == SendCheck::LANE || aCheck == SendCheck::NO_GRAVE)
-					DrawTextShadow(g, "X", aX + 19, aY + 33, Sexy::FONT_HOUSEOFTERROR16, Color(255, 70, 70), DrawStringJustification::DS_ALIGN_CENTER);
+					DrawTextShadow(g, "X", aX + 19, aY + 30, Sexy::FONT_HOUSEOFTERROR16, Color(255, 70, 70), DrawStringJustification::DS_ALIGN_CENTER);
 			}
 
 			// Page: name, Q/E and the name of each zombie on it
@@ -1019,17 +1039,16 @@ namespace ModVersus
 			Zombie::PreloadZombieResources(sRoster[i].mEntry->mZombieType);
 		UpdateGraves(theBoard);
 
-		std::string aAdvice = "Versus: el jugador zombi elige carril con W/S, pagina con Q/E y manda zombis con 1-9";
-		std::string aJoin = sNet.mJoinText ? sNet.mJoinText() : "";
-		if (!aJoin.empty())
-			aAdvice = std::format("Versus. Jugador zombi en otro aparato: abre {} en el navegador. O aqui mismo: W/S, Q/E y 1-9", aJoin);
-		theBoard->DisplayAdvice(aAdvice, MessageStyle::MESSAGE_STYLE_HINT_TALL_LONG, AdviceType::ADVICE_NONE);
+		// The rules in the middle of the lawn while the plants get going; the address for the other device stays above the bar
+		std::string aAdvice = std::format("Versus {}. Zombis: W/S carril, Q/E pagina, 1-9 mandar. Ganan si se comen {} cerebros; las plantas, si aguantan {}",
+			sStage->mName, BRAINS_TO_WIN, ClockText(DurationTicks()));
+		theBoard->DisplayAdvice(aAdvice, MessageStyle::MESSAGE_STYLE_BIG_MIDDLE, AdviceType::ADVICE_NONE);
 		bool aCheats = false;
 #ifdef PVZ_HACK_MENU
 		aCheats = Mods::MatchCheatsOn();
 #endif
 		if (aCheats)
-			ShowMessage(theBoard, "Trucos en pausa en Versus (solo cuenta la velocidad)");
+			ShowMessage(theBoard, "Trucos en pausa en Versus (solo cuenta la velocidad)", GRACE_TICKS);
 		PvzpLogLn("Versus: {} starts, {} zombies in {} pages, {} s, cheats paused {}", sStage->mName, sNumRoster, sNumPages, DurationTicks() / 100, aCheats);
 	}
 
@@ -1063,7 +1082,7 @@ namespace ModVersus
 		if (!sWarnedEnd && DurationTicks() - aTick <= 3000 && DurationTicks() > 6000)
 		{
 			sWarnedEnd = true;
-			theBoard->DisplayAdvice("Ultimos 30 segundos!", MessageStyle::MESSAGE_STYLE_HINT_FAST, AdviceType::ADVICE_NONE);
+			theBoard->DisplayAdvice("Ultimos 30 segundos!", MessageStyle::MESSAGE_STYLE_BIG_MIDDLE_FAST, AdviceType::ADVICE_NONE);
 		}
 		if (aTick % 10 == 0)
 			UpdateGraves(theBoard);
@@ -1236,7 +1255,7 @@ namespace ModVersus
 			sStage->mName, sPhase + 1, PHASE_NAMES[sPhase], std::max(0, (GraceTicks() - aTick + 99) / 100), std::max(0, DurationTicks() - aEnd) / 100, ClockText(DurationTicks() - aEnd),
 			sBrains, BRAIN_INCOME[sPhase], sBrainsEaten, BRAINS_TO_WIN, sLane, sPage, StageHasGraves(theBoard) ? "true" : "false", sGraveMode ? "true" : "false",
 			aOver ? "true" : "false", sWinner == Winner::PLANTS ? "plantas" : sWinner == Winner::ZOMBIES ? "zombis" : "",
-			sSent, sKilled, sPlantsEaten, sBrainsEaten, ClockText(aEnd), aTick - sMessageTick < MESSAGE_TICKS ? sMessage : "");
+			sSent, sKilled, sPlantsEaten, sBrainsEaten, ClockText(aEnd), aTick - sMessageTick < sMessageTicks ? sMessage : "");
 
 		aJson += "\"lanes\":[";
 		bool aFirst = true;
@@ -1334,9 +1353,9 @@ namespace ModVersus
 		}
 
 		// A message for both players, above the bar
-		if (aTick - sMessageTick < MESSAGE_TICKS && !sMessage.empty() && sWinner == Winner::NONE)
+		if (aTick - sMessageTick < sMessageTicks && !sMessage.empty() && sWinner == Winner::NONE)
 		{
-			int aAlpha = std::clamp((MESSAGE_TICKS - (aTick - sMessageTick)) * 4, 0, 255);
+			int aAlpha = std::clamp((sMessageTicks - (aTick - sMessageTick)) * 4, 0, 255);
 			DrawTextShadow(g, sMessage, 400, BAR_TOP - 26, Sexy::FONT_HOUSEOFTERROR16, Color(255, 220, 120, aAlpha), DrawStringJustification::DS_ALIGN_CENTER);
 		}
 

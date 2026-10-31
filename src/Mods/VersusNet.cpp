@@ -295,6 +295,7 @@ img{width:min(100%,calc((100vh - 230px)*4/3));min-width:min(100%,320px);aspect-r
 .lanes .on{background:#7a2a3a;border-color:#ff7a8a}
 .lanes .water{box-shadow:inset 0 -4px 0 #3a8fd8}
 .lanes .lost{text-decoration:line-through;color:var(--dim)}
+.lanes .grave::after{content:"";display:inline-block;width:7px;height:9px;border-radius:4px 4px 1px 1px;background:#b98aff;margin-left:4px}
 button{background:#2e2924;color:#eee;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 button:active{background:#5a2a3a}
 #grave.on{background:#4a2a6a;border-color:#b98aff}
@@ -313,7 +314,7 @@ h3 span{color:var(--dim);font-weight:400}
 #over h2{margin:0 0 6px;font-size:24px}
 #over p{margin:3px 0}
 p.help{margin:0;color:var(--dim);font-size:13px;text-align:center}
-@media (max-width:520px){.top{grid-template-columns:1fr 1fr}.top .box:last-child{grid-column:span 2}.grid{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}}
+@media (max-width:520px){.top{grid-template-columns:1fr 1fr}.top .box:last-child{grid-column:span 2}.grid{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}.lanes{gap:4px}.lanes button{min-width:36px;padding:9px 7px}}
 </style></head><body>
 <img id="game" alt="El juego en vivo">
 <div class="wrap">
@@ -325,7 +326,7 @@ p.help{margin:0;color:var(--dim);font-size:13px;text-align:center}
 <div id="msg"></div>
 <div class="lanes"><button data-k="38">&#9650;</button><span id="lanes" class="lanes"></span><button data-k="40">&#9660;</button><button id="grave" data-k="84" hidden>Tumba</button></div>
 <div id="roster"></div>
-<p class="help">Teclado: W/S o flechas cambian el carril, Q/E la pagina, 1-9 mandan de la pagina activa (punto dorado), T alterna la tumba de noche.</p>
+<p class="help">Carriles: azul es agua, tachado ya sin cerebro, morado con tumba. Teclado: W/S o flechas cambian el carril, Q/E la pagina, 1-9 mandan de la pagina activa (punto dorado), T alterna la tumba de noche.</p>
 </div>
 <div id="over"><div class="card"><h2 id="overTitle"></h2><div id="overStats"></div></div></div>
 <script>
@@ -365,7 +366,7 @@ function render(s){
   let e='';for(let i=0;i<s.need;i++)e+='<span class="brain'+(i>=s.need-s.eaten?' eaten':'')+'"></span>';$('eaten').innerHTML=e;
   $('msg').textContent=s.message||'';
   const ls=s.lanes.map(l=>l.row+(l.water?'w':'')+(l.brain?'':'x')+(l.grave?'g':'')).join(',');
-  if(ls!==lanesSig){lanesSig=ls;const L=$('lanes');L.innerHTML='';s.lanes.forEach(l=>{const b=document.createElement('button');b.textContent=(l.row+1)+(l.grave&&s.graves?'+':'');b.dataset.row=l.row;if(l.water)b.classList.add('water');if(!l.brain)b.classList.add('lost');b.title=l.water?'agua':'tierra';b.addEventListener('click',()=>cmd('l='+l.row));L.appendChild(b);});}
+  if(ls!==lanesSig){lanesSig=ls;const L=$('lanes');L.innerHTML='';s.lanes.forEach(l=>{const b=document.createElement('button');b.textContent=l.row+1;b.dataset.row=l.row;if(l.water)b.classList.add('water');if(l.grave&&s.graves)b.classList.add('grave');if(!l.brain)b.classList.add('lost');b.title=l.water?'agua':'tierra';b.addEventListener('click',()=>cmd('l='+l.row));L.appendChild(b);});}
   $('lanes').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.row===s.lane));
   const g=$('grave');g.hidden=!s.graves;g.classList.toggle('on',s.graveMode);g.textContent=s.graveMode?'Desde la tumba':'Tumba';
   s.zombies.forEach(z=>{const b=buttons[z.i];if(!b)return;
