@@ -54,6 +54,7 @@ namespace
 		{ "ModFreezeZombies", &gSettings.mFreezeZombies },
 		{ "ModOneHitKill", &gSettings.mOneHitKill },
 		{ "ModInfiniteCoins", &gSettings.mInfiniteCoins },
+		{ "ModARView", &gSettings.mARView },
 	};
 
 	// PVZ_MOD_TEST=1 drives the game without a mouse so new content can be checked on screen:
