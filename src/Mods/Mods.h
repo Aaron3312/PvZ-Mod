@@ -30,6 +30,10 @@ namespace Mods
 	void			OnUpdate(LawnApp* theApp);	// once per game tick
 	int				UpdatesPerFrame();
 
+	// A versus match ignores the cheats that tilt it (all but the speed) without changing the saved settings.
+	bool			CheatsSuspended();
+	bool			MatchCheatsOn();			// one of those is set
+
 	int				ScaleCost(int theCost);
 	int				ScaleDamage(int theDamage);
 	void			ScaleZombieHealth(Zombie* theZombie);

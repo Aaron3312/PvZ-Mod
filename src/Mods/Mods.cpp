@@ -11,6 +11,7 @@
 #include "Lawn/Widget/SeedChooserScreen.h"
 #include "Lawn/Widget/ChallengeScreen.h"
 #include "ModContent.h"
+#include "Versus.h"
 #include "HackMenu.h"
 #include <format>
 #include "Lawn/Projectile.h"
@@ -166,7 +167,7 @@ namespace
 			break;
 		case 3:
 			if (TestModeNumber() > 0 && theApp->mBoard && theApp->mGameScene == GameScenes::SCENE_PLAYING && sTicks > 250 &&
-				theApp->mGameMode == GameMode::GAMEMODE_MOD_VERSUS)
+				ModVersus::IsVersus(theApp->mGameMode))
 			{
 				// Versus has no waves: PVZ_MOD_TEST_VERSUS plays both sides from Versus.cpp.
 				sStep = 4;
@@ -218,6 +219,10 @@ namespace
 			// Every 2 s: each zombie and the projectile mix, so the result can be read from the log.
 			if (sTicks == 600 || sTicks == 900)
 				TestScreenshot(TestModeNumber() > 0 ? std::format("mode{}-{}", TestModeNumber(), sTicks).c_str() : std::format("board-{}", sTicks).c_str());
+			// PVZ_MOD_TEST_VERSUS_SHOTS=<ticks>: a versus test also saves a frame that often, to follow a whole match.
+			static const int sVersusShots = SDL_getenv("PVZ_MOD_TEST_VERSUS_SHOTS") ? SDL_atoi(SDL_getenv("PVZ_MOD_TEST_VERSUS_SHOTS")) : 0;
+			if (sVersusShots > 0 && theApp->mBoard && ModVersus::IsVersus(theApp->mGameMode) && sTicks % sVersusShots == 0)
+				TestScreenshot(std::format("mode{}-t{:05}", TestModeNumber(), sTicks).c_str());
 			// PVZ_MOD_TEST_SAVELOAD: at 10 s, save, throw the board away and load it again (what "Continue" does),
 			// to check that the mod fields survive a saved game. The file goes next to the screenshots.
 			static const bool sSaveLoad = SDL_getenv("PVZ_MOD_TEST_SAVELOAD") != nullptr && SDL_getenv("PVZ_MOD_TEST_SHOTS") != nullptr;
@@ -308,6 +313,16 @@ void Mods::Load(LawnApp* theApp)
 	for (const BoolField& aField : gBoolFields)
 		theApp->RegistryReadBoolean(aField.mKey, aField.mValue);
 	ClampSettings();
+
+	// PVZ_MOD_TEST_CHEATS=1: a test turns on the cheats a versus must ignore, in memory only (never saved).
+	if (SDL_getenv("PVZ_MOD_TEST") && SDL_getenv("PVZ_MOD_TEST_CHEATS"))
+	{
+		gSettings.mFreezeZombies = true;
+		gSettings.mInvinciblePlants = true;
+		gSettings.mOneHitKill = true;
+		gSettings.mInfiniteSun = true;
+		gSettings.mZombieHealthPercent = 10;
+	}
 }
 
 void Mods::Save(LawnApp* theApp)
@@ -319,6 +334,17 @@ void Mods::Save(LawnApp* theApp)
 		theApp->RegistryWriteBoolean(aField.mKey, *aField.mValue);
 }
 
+bool Mods::CheatsSuspended()
+{
+	return gLawnApp && gLawnApp->mBoard && ModVersus::IsVersus(gLawnApp->mGameMode);
+}
+
+bool Mods::MatchCheatsOn()
+{
+	return gSettings.mInfiniteSun || gSettings.mNoRecharge || gSettings.mEasyPlanting || gSettings.mInvinciblePlants || gSettings.mFreezeZombies ||
+		gSettings.mOneHitKill || gSettings.mCostPercent != 100 || gSettings.mDamagePercent != 100 || gSettings.mZombieHealthPercent != 100;
+}
+
 void Mods::OnUpdate(LawnApp* theApp)
 {
 	static const bool sModTest = SDL_getenv("PVZ_MOD_TEST") != nullptr;
@@ -326,17 +352,18 @@ void Mods::OnUpdate(LawnApp* theApp)
 		UpdateModTest(theApp);
 
 	// Only touch the cheat flag while the menu owns it, so the '8' debug key keeps working.
-	if (gSettings.mEasyPlanting != gAppliedEasyPlanting)
+	bool aEasyPlanting = gSettings.mEasyPlanting && !CheatsSuspended();
+	if (aEasyPlanting != gAppliedEasyPlanting)
 	{
-		theApp->mEasyPlantingCheat = gSettings.mEasyPlanting;
-		gAppliedEasyPlanting = gSettings.mEasyPlanting;
+		theApp->mEasyPlantingCheat = aEasyPlanting;
+		gAppliedEasyPlanting = aEasyPlanting;
 	}
 
 	if (gSettings.mInfiniteCoins && theApp->mPlayerInfo && theApp->mPlayerInfo->mCoins < MAX_COINS)
 		theApp->mPlayerInfo->mCoins = MAX_COINS;
 
 	Board* aBoard = theApp->mBoard;
-	if (!aBoard)
+	if (!aBoard || CheatsSuspended())
 		return;
 
 	if (gSettings.mInfiniteSun && aBoard->mSunMoney < MAX_SUN)
@@ -373,16 +400,22 @@ void Mods::OnUpdate(LawnApp* theApp)
 
 int Mods::UpdatesPerFrame()
 {
-	return gSettings.mSpeed;
+	// PVZ_MOD_TEST_SPEED: a test can run faster than the saved speed, to play a whole versus in a short run.
+	static const int sTestSpeed = SDL_getenv("PVZ_MOD_TEST") && SDL_getenv("PVZ_MOD_TEST_SPEED") ? std::clamp(SDL_atoi(SDL_getenv("PVZ_MOD_TEST_SPEED")), 1, 10) : 0;
+	return sTestSpeed > 0 ? sTestSpeed : gSettings.mSpeed;
 }
 
 int Mods::ScaleCost(int theCost)
 {
+	if (CheatsSuspended())
+		return theCost;
 	return gSettings.mCostPercent >= 100 ? theCost : theCost * gSettings.mCostPercent / 100;
 }
 
 int Mods::ScaleDamage(int theDamage)
 {
+	if (CheatsSuspended())
+		return theDamage;
 	if (gSettings.mOneHitKill && theDamage > 0)
 		return ONE_HIT_DAMAGE;
 	return ScalePercent(theDamage, gSettings.mDamagePercent);
@@ -391,7 +424,7 @@ int Mods::ScaleDamage(int theDamage)
 void Mods::ScaleZombieHealth(Zombie* theZombie)
 {
 	const int aPercent = gSettings.mZombieHealthPercent;
-	if (aPercent == 100)
+	if (aPercent == 100 || CheatsSuspended())
 		return;
 	theZombie->mBodyHealth = ScalePercent(theZombie->mBodyHealth, aPercent);
 	theZombie->mBodyMaxHealth = ScalePercent(theZombie->mBodyMaxHealth, aPercent);

@@ -253,11 +253,16 @@ namespace
 		}
 		ImGui::PushItemWidth(ImGui::GetFontSize() * 12);
 
+		// A versus ignores everything here but the speed; the settings stay as they are for the next level.
+		bool aVersus = Mods::CheatsSuspended();
+		if (aVersus)
+			ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "Trucos en pausa en Versus: solo cuenta la velocidad");
+
 		if (ImGui::CollapsingHeader("Sol y plantas", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			aChanged |= ImGui::Checkbox("Sol infinito", &s.mInfiniteSun);
 			ImGui::SameLine();
-			ImGui::BeginDisabled(!aBoard);
+			ImGui::BeginDisabled(!aBoard || aVersus);
 			if (ImGui::Button("+1000 sol"))
 				aBoard->AddSunMoney(1000);
 			ImGui::EndDisabled();
@@ -275,7 +280,7 @@ namespace
 			aChanged |= ImGui::SliderInt("Vida de zombis nuevos (%)", &s.mZombieHealthPercent, 10, 1000);
 			aChanged |= ImGui::Checkbox("Zombis congelados", &s.mFreezeZombies);
 
-			ImGui::BeginDisabled(!IsPlaying());
+			ImGui::BeginDisabled(!IsPlaying() || aVersus);
 			if (ImGui::Button("Matar todos los zombis"))
 				aBoard->RemoveAllZombies();
 			ImGui::SetNextItemWidth(220 * gScale);
@@ -290,7 +295,7 @@ namespace
 		{
 			aChanged |= ImGui::SliderInt("Velocidad", &s.mSpeed, 1, 10, "x%d");
 			aChanged |= ImGui::Checkbox("Dinero infinito ($999,990)", &s.mInfiniteCoins);
-			ImGui::BeginDisabled(!IsPlaying());
+			ImGui::BeginDisabled(!IsPlaying() || aVersus);
 			if (ImGui::Button("Ganar el nivel"))
 				WinLevel();
 			ImGui::SameLine();
