@@ -63,7 +63,7 @@ namespace ModContent
 
 	constexpr bool IsModGameMode(GameMode theGameMode)
 	{
-		return theGameMode >= GameMode::GAMEMODE_MOD_INVASION && theGameMode <= GameMode::GAMEMODE_MOD_VERSUS;
+		return theGameMode >= GameMode::GAMEMODE_MOD_INVASION && theGameMode <= GameMode::GAMEMODE_MOD_VERSUS_ROOF;
 	}
 
 	constexpr float GIANTS_MODE_SCALE = 1.4f;		// "Gigantes": every zombie this big, with twice the health

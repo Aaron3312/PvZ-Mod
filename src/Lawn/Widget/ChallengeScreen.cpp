@@ -31,6 +31,7 @@
 #include "../../PvzpLib/PvzpCommon.h"
 #include "misc/Debug.h"
 #include "../../PvzpLib/PvzpStringFile.h"
+#include "../../Mods/Versus.h"
 #include "widget/WidgetManager.h"
 #include <SDL.h>
 #include <algorithm>
@@ -113,7 +114,12 @@ constinit const ChallengeDefinition gChallengeDefs[NUM_CHALLENGE_MODES] = {
 	{ .mChallengeMode = GameMode::GAMEMODE_MOD_GIANTS, .mChallengeIconIndex = 12, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 0, .mCol = 2, .mChallengeName = "[MOD_GIANTS]" },
 	{ .mChallengeMode = GameMode::GAMEMODE_MOD_CONVEYOR, .mChallengeIconIndex = 4, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 0, .mCol = 3, .mChallengeName = "[MOD_CONVEYOR]" },
 	{ .mChallengeMode = GameMode::GAMEMODE_MOD_POOL_CHAOS, .mChallengeIconIndex = 7, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 0, .mCol = 4, .mChallengeName = "[MOD_POOL_CHAOS]" },
-	{ .mChallengeMode = GameMode::GAMEMODE_MOD_VERSUS, .mChallengeIconIndex = 11, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 1, .mCol = 0, .mChallengeName = "[MOD_VERSUS]" },
+	// The versus modes show their stage with the survival thumbnails (ChallengeScreen::DrawButton)
+	{ .mChallengeMode = GameMode::GAMEMODE_MOD_VERSUS, .mChallengeIconIndex = 0, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 1, .mCol = 0, .mChallengeName = "[MOD_VERSUS]" },
+	{ .mChallengeMode = GameMode::GAMEMODE_MOD_VERSUS_NIGHT, .mChallengeIconIndex = 1, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 1, .mCol = 1, .mChallengeName = "[MOD_VERSUS_NIGHT]" },
+	{ .mChallengeMode = GameMode::GAMEMODE_MOD_VERSUS_POOL, .mChallengeIconIndex = 2, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 1, .mCol = 2, .mChallengeName = "[MOD_VERSUS_POOL]" },
+	{ .mChallengeMode = GameMode::GAMEMODE_MOD_VERSUS_FOG, .mChallengeIconIndex = 3, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 1, .mCol = 3, .mChallengeName = "[MOD_VERSUS_FOG]" },
+	{ .mChallengeMode = GameMode::GAMEMODE_MOD_VERSUS_ROOF, .mChallengeIconIndex = 4, .mPage = ChallengePage::CHALLENGE_PAGE_MODS, .mRow = 1, .mCol = 4, .mChallengeName = "[MOD_VERSUS_ROOF]" },
 	{ .mChallengeMode = GameMode::GAMEMODE_UPSELL, .mChallengeIconIndex = 10, .mPage = ChallengePage::CHALLENGE_PAGE_LIMBO, .mRow = 3, .mCol = 4, .mChallengeName = "Upsell" },
 	{ .mChallengeMode = GameMode::GAMEMODE_INTRO, .mChallengeIconIndex = 10, .mPage = ChallengePage::CHALLENGE_PAGE_LIMBO, .mRow = 2, .mCol = 3, .mChallengeName = "Intro" }
 };
@@ -446,7 +452,7 @@ void ChallengeScreen::DrawButton(Graphics* g, int theChallengeIndex)
 				g->SetColorizeImages(true);
 			}
 
-			if (mPageIndex == CHALLENGE_PAGE_SURVIVAL)
+			if (mPageIndex == CHALLENGE_PAGE_SURVIVAL || ModVersus::IsVersus(aDef.mChallengeMode))
 			{
 				g->DrawImageCel(Sexy::IMAGE_SURVIVAL_THUMBNAILS, aPosX + 13, aPosY + 4, aDef.mChallengeIconIndex);
 			}

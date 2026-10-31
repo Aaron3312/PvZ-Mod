@@ -938,6 +938,7 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_PUZZLE_I_ZOMBIE_9:
 	case GameMode::GAMEMODE_PUZZLE_I_ZOMBIE_ENDLESS:
 	case GameMode::GAMEMODE_MOD_GHOST_NIGHT:
+	case GameMode::GAMEMODE_MOD_VERSUS_NIGHT:
 		mBackground = BackgroundType::BACKGROUND_2_NIGHT;
 		break;
 
@@ -950,6 +951,7 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_CHALLENGE_LAST_STAND:
 	case GameMode::GAMEMODE_CHALLENGE_WAR_AND_PEAS_2:
 	case GameMode::GAMEMODE_MOD_POOL_CHAOS:
+	case GameMode::GAMEMODE_MOD_VERSUS_POOL:
 	case GameMode::GAMEMODE_UPSELL:
 	case GameMode::GAMEMODE_INTRO:
 		mBackground = BackgroundType::BACKGROUND_3_POOL;
@@ -962,6 +964,7 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_CHALLENGE_INVISIGHOUL:
 	case GameMode::GAMEMODE_CHALLENGE_AIR_RAID:
 	case GameMode::GAMEMODE_CHALLENGE_STORMY_NIGHT:
+	case GameMode::GAMEMODE_MOD_VERSUS_FOG:
 		mBackground = BackgroundType::BACKGROUND_4_FOG;
 		break;
 
@@ -972,6 +975,7 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_CHALLENGE_POGO_PARTY:
 	case GameMode::GAMEMODE_CHALLENGE_HIGH_GRAVITY:
 	case GameMode::GAMEMODE_CHALLENGE_BUNGEE_BLITZ:
+	case GameMode::GAMEMODE_MOD_VERSUS_ROOF:
 		mBackground = BackgroundType::BACKGROUND_5_ROOF;
 		break;
 
@@ -5106,6 +5110,10 @@ void Board::ZombiesWon(Zombie* theZombie)
 	{
 		aGameOverMsg = "[I_ZOMBIE_DEATH_MESSAGE]";
 	}
+	else if (ModVersus::IsVersus(mApp->mGameMode))
+	{
+		aGameOverMsg = ModVersus::ZombiesWonMessage();
+	}
 	else
 	{
 		mApp->mGameScene = GameScenes::SCENE_ZOMBIES_WON;
@@ -6648,6 +6656,9 @@ void Board::DrawHouseDoorTop(Graphics* g)
 
 void Board::DrawLevel(Graphics* g)
 {
+	if (ModVersus::IsVersus(mApp->mGameMode))
+		return;	// the versus bar has the stage, the phase and the clock (Mods/Versus.cpp)
+
 	std::string aLevelStr;
 	if (mApp->IsAdventureMode())
 	{

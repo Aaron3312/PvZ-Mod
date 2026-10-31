@@ -1,4 +1,5 @@
 #include "ModContent.h"
+#include "Versus.h"
 #include "LawnApp.h"
 #include "Lawn/Zombie.h"
 #include "Lawn/Plant.h"
@@ -55,7 +56,11 @@ namespace
 		{ "MOD_GIANTS", "Gigantes" },
 		{ "MOD_CONVEYOR", "Cinta mod" },
 		{ "MOD_POOL_CHAOS", "Caos en la piscina" },
-		{ "MOD_VERSUS", "Versus" },
+		{ "MOD_VERSUS", "Versus Dia" },
+		{ "MOD_VERSUS_NIGHT", "Versus Noche" },
+		{ "MOD_VERSUS_POOL", "Versus Piscina" },
+		{ "MOD_VERSUS_FOG", "Versus Niebla" },
+		{ "MOD_VERSUS_ROOF", "Versus Tejado" },
 
 		{ "POISON_PEASHOOTER", "Lanzaveneno" },
 		{ "POISON_PEASHOOTER_TOOLTIP", "Sus guisantes envenenan" },
@@ -269,6 +274,7 @@ void ModContent::OnZombieKilled(Zombie* theZombie)
 	if (!theZombie->IsOnBoard() || theZombie->mModDeathDone)
 		return;
 	theZombie->mModDeathDone = true;
+	ModVersus::OnZombieKilled(theZombie);
 	// Spawning and killing while the board loops over zombies or plants is fine: the arrays have a fixed size
 	// and the loops skip whatever is dead (the Gargantuar throws its Imp the same way).
 	if (theZombie->mZombieType == ZombieType::ZOMBIE_SPLITTER)

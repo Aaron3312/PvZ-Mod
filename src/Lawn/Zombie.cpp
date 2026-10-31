@@ -47,6 +47,7 @@
 #include "Mods/Mods.h"
 #endif
 #include "Mods/ModContent.h"
+#include "Mods/Versus.h"
 #include <algorithm>
 
 constexpr const int ZOMBIE_START_RANDOM_OFFSET = 40;
@@ -4601,6 +4602,10 @@ void Zombie::CheckForBoardEdge()
 		{
 			DieNoLoot();
 		}
+		else if (ModVersus::ZombieReachedHouse(this))
+		{
+			return;	// it ate a house brain instead of ending the game
+		}
 		else
 		{
 			mBoard->ZombiesWon(this);
@@ -7212,6 +7217,7 @@ void Zombie::EatPlant(Plant* thePlant)
 		mBoard->mPlantsEaten++;
 		thePlant->Die();
 		mBoard->mChallenge->ZombieAtePlant(thePlant);
+		ModVersus::OnPlantEaten(thePlant);
 
 		if (mBoard->mLevel >= 2 && mBoard->mLevel <= 4 && mApp->IsFirstTimeAdventureMode())
 		{

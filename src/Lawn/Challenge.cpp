@@ -2535,10 +2535,9 @@ void Challenge::InitZombieWaves()
 		aList[ZOMBIE_HOPPER] = true;
 		aList[ZOMBIE_SPEEDY] = true;
 	}
-	else if (aGameMode == GAMEMODE_MOD_VERSUS)
+	else if (ModVersus::IsVersus(aGameMode))
 	{
-		for (int i = 0; i < ModVersus::NUM_ROSTER; i++)
-			aList[ModVersus::GetRosterEntry(i).mZombieType] = true;
+		ModVersus::AllowZombies(aGameMode, aList);
 	}
 	else if (aGameMode == GAMEMODE_MOD_GIANTS)
 	{

@@ -79,6 +79,12 @@ namespace
 	std::mutex			gKeyMutex;
 	std::deque<int>		gKeys;
 
+	// The match as JSON for /state, written on the game thread (OnFrame) and served by the accept thread
+	constexpr int		STATE_INTERVAL_MS = 150;
+	std::mutex			gStateMutex;
+	std::string			gStateJson = "{\"playing\":false}";
+	uint32_t			gLastState = 0;
+
 	// The latest JPEG, shared with every stream connection
 	std::mutex			gFrameMutex;
 	std::condition_variable gFrameCond;
@@ -93,9 +99,18 @@ namespace
 	int					gRawHeight = 0;
 	bool				gRawReady = false;
 
+	// Arrows, W/S (lane), Q/E (page), T (grave) and 1-9 (send); /cmd?z= and ?l= come as ModVersus::NET_ commands.
 	bool IsZombieKey(int theKey)
 	{
-		return theKey == 38 || theKey == 40 || theKey == 'W' || theKey == 'S' || (theKey >= '1' && theKey <= '9');
+		return theKey == 38 || theKey == 40 || theKey == 'W' || theKey == 'S' || theKey == 'Q' || theKey == 'E' || theKey == 'T' ||
+			(theKey >= '1' && theKey <= '9');
+	}
+
+	void PushKey(int theKey)
+	{
+		std::lock_guard<std::mutex> aLock(gKeyMutex);
+		if (gKeys.size() < MAX_QUEUED_KEYS)
+			gKeys.push_back(theKey);
 	}
 
 	bool SendAll(int theFd, const void* theData, size_t theSize)
@@ -253,46 +268,121 @@ namespace
 		*theDone = true;
 	}
 
+	// The zombie player's page: the game live, and buttons built from /state (the stage's roster, grouped by page)
+	// that grey out what can't be sent and show the recharges. Plain text without accents, like the game's.
 	std::string BuildPage()
 	{
-		std::string aButtons;
-		for (int i = 0; i < ModVersus::NUM_ROSTER; i++)
-		{
-			const ModVersus::RosterEntry& aEntry = ModVersus::GetRosterEntry(i);
-			aButtons += std::format("<button data-k=\"{}\"><b>{}</b> {}<small>{} cerebros</small></button>", '1' + i, i + 1, aEntry.mName, aEntry.mCost);
-		}
-		std::string aPage = R"HTML(<!doctype html>
+		return R"HTML(<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PvZ Versus: zombis</title>
 <style>
-:root{color-scheme:dark}
-body{margin:0;background:#141210;color:#eee;font:15px -apple-system,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px 16px 16px}
-img{width:min(100%,calc((100vh - 190px)*4/3));aspect-ratio:4/3;background:#000;border-radius:8px}
-.row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:900px}
-button{background:#2a2622;color:#eee;border:1px solid #4a433c;border-radius:8px;padding:10px 10px;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;min-width:84px;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+:root{color-scheme:dark;--bg:#141210;--card:#26221e;--line:#463e36;--pink:#f39ad0;--gold:#e8c46a;--dim:#8a8178}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#eee;font:15px -apple-system,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 16px 20px}
+img{width:min(100%,calc((100vh - 230px)*4/3));min-width:min(100%,320px);aspect-ratio:4/3;background:#000;border-radius:8px;display:block}
+.wrap{width:100%;max-width:900px;display:flex;flex-direction:column;gap:8px}
+.top{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-width:0}
+.box small{display:block;color:var(--dim);font-size:12px}
+.big{font-size:22px;font-weight:700;color:var(--pink);font-variant-numeric:tabular-nums}
+.clock{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.brains{display:flex;gap:4px;margin-top:3px}
+.brain{width:18px;height:14px;border-radius:9px 9px 6px 6px;background:#f3a6c8;border:1px solid #b56b8c}
+.brain.eaten{background:#3b3030;border-color:#5a4848}
+#msg{min-height:20px;text-align:center;color:var(--gold);font-size:14px}
+.lanes{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.lanes button{min-width:46px}
+.lanes .on{background:#7a2a3a;border-color:#ff7a8a}
+.lanes .water{box-shadow:inset 0 -4px 0 #3a8fd8}
+.lanes .lost{text-decoration:line-through;color:var(--dim)}
+button{background:#2e2924;color:#eee;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 button:active{background:#5a2a3a}
-button small{color:#f39ad0;font-size:12px}
-.lane button{min-width:130px;flex-direction:row;gap:6px;justify-content:center}
-p{margin:0;color:#aaa;font-size:13px;text-align:center}
+#grave.on{background:#4a2a6a;border-color:#b98aff}
+h3{margin:6px 0 2px;font-size:14px;color:var(--gold);font-weight:600}
+h3 span{color:var(--dim);font-weight:400}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
+.z{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:7px 8px 9px;min-height:58px}
+.z b{font-size:15px}
+.z .cost{color:var(--pink);font-size:13px}
+.z .why{color:var(--dim);font-size:12px;min-height:15px}
+.z .bar{position:absolute;left:0;bottom:0;height:4px;background:#e86a9a;width:0}
+.z.off{opacity:.5}
+.z.page b::before{content:"";display:inline-block;width:6px;height:6px;border-radius:3px;background:var(--gold);margin-right:5px;vertical-align:2px}
+#over{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);align-items:center;justify-content:center;padding:16px}
+#over .card{background:var(--card);border:2px solid var(--pink);border-radius:12px;padding:18px 20px;max-width:420px;width:100%}
+#over h2{margin:0 0 6px;font-size:24px}
+#over p{margin:3px 0}
+p.help{margin:0;color:var(--dim);font-size:13px;text-align:center}
+@media (max-width:520px){.top{grid-template-columns:1fr 1fr}.top .box:last-child{grid-column:span 2}.grid{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}}
 </style></head><body>
 <img id="game" alt="El juego en vivo">
-<div class="row lane"><button data-k="38">&#9650; Carril arriba</button><button data-k="40">&#9660; Carril abajo</button></div>
-<div class="row">{BUTTONS}</div>
-<p>Teclado: W/S o las flechas cambian el carril, 1-9 mandan el zombi. Los cerebros y el reloj se ven en la barra del juego.</p>
+<div class="wrap">
+<div class="top">
+<div class="box"><small>Cerebros</small><span class="big" id="brains">-</span> <small id="income"></small></div>
+<div class="box"><small id="phase">Esperando la partida</small><span class="clock" id="clock">-</span></div>
+<div class="box"><small>Cerebros comidos</small><div class="brains" id="eaten"></div></div>
+</div>
+<div id="msg"></div>
+<div class="lanes"><button data-k="38">&#9650;</button><span id="lanes" class="lanes"></span><button data-k="40">&#9660;</button><button id="grave" data-k="84" hidden>Tumba</button></div>
+<div id="roster"></div>
+<p class="help">Teclado: W/S o flechas cambian el carril, Q/E la pagina, 1-9 mandan de la pagina activa (punto dorado), T alterna la tumba de noche.</p>
+</div>
+<div id="over"><div class="card"><h2 id="overTitle"></h2><div id="overStats"></div></div></div>
 <script>
 const code=new URLSearchParams(location.search).get('c')||'';
 const img=document.getElementById('game');
 function connect(){img.src='/stream?c='+code+'&t='+Date.now();}
 img.onerror=()=>setTimeout(connect,1000);
 connect();
-function send(k){fetch('/cmd?c='+code+'&k='+k,{cache:'no-store'}).catch(()=>{});}
-document.querySelectorAll('button[data-k]').forEach(b=>b.addEventListener('click',()=>send(b.dataset.k)));
-const keys={ArrowUp:38,ArrowDown:40,w:87,W:87,s:83,S:83};
-addEventListener('keydown',e=>{let k=keys[e.key];if(!k&&e.key>='1'&&e.key<='9')k=e.key.charCodeAt(0);if(!k)return;e.preventDefault();if(!e.repeat)send(k);});
+const $=id=>document.getElementById(id);
+function cmd(q){fetch('/cmd?c='+code+'&'+q,{cache:'no-store'}).then(()=>setTimeout(poll,60)).catch(()=>{});}
+document.querySelectorAll('button[data-k]').forEach(b=>b.addEventListener('click',()=>cmd('k='+b.dataset.k)));
+const keys={ArrowUp:38,ArrowDown:40,w:87,W:87,s:83,S:83,q:81,Q:81,e:69,E:69,t:84,T:84};
+addEventListener('keydown',e=>{let k=keys[e.key];if(!k&&e.key>='1'&&e.key<='9')k=e.key.charCodeAt(0);if(!k)return;e.preventDefault();if(!e.repeat)cmd('k='+k);});
+const why={ok:'',fin:'',espera:'',fase:'',recarga:'',cerebros:'faltan cerebros',carril:'no va en este carril',tumba:'sin tumba aqui'};
+let sig='',lanesSig='',buttons=[];
+function build(s){
+  const root=$('roster');root.innerHTML='';buttons=[];
+  s.pages.forEach((name,p)=>{
+    const h=document.createElement('h3');h.innerHTML=name+' <span>pagina '+(p+1)+'</span>';root.appendChild(h);
+    const grid=document.createElement('div');grid.className='grid';root.appendChild(grid);
+    s.zombies.filter(z=>z.page===p).forEach(z=>{
+      const b=document.createElement('button');b.className='z';
+      b.innerHTML='<b></b><span class="cost"></span><span class="why"></span><span class="bar"></span>';
+      b.querySelector('b').textContent=z.name;
+      b.addEventListener('click',()=>{if(!b.classList.contains('off'))cmd('z='+z.i);});
+      grid.appendChild(b);buttons[z.i]=b;
+    });
+  });
+}
+function render(s){
+  if(!s.playing){$('phase').textContent='Esperando la partida';return;}
+  const nsig=s.stage+'|'+s.zombies.map(z=>z.name).join(',');
+  if(nsig!==sig){sig=nsig;build(s);}
+  $('brains').textContent=s.brains;$('income').textContent='+'+s.income+' cada 3 s';
+  $('phase').textContent=s.grace>0?'Versus '+s.stage+': preparacion':'Versus '+s.stage+': fase '+s.phase+', '+s.phaseName;
+  $('clock').textContent=s.grace>0?'Zombis en '+s.grace+' s':s.clock;
+  let e='';for(let i=0;i<s.need;i++)e+='<span class="brain'+(i>=s.need-s.eaten?' eaten':'')+'"></span>';$('eaten').innerHTML=e;
+  $('msg').textContent=s.message||'';
+  const ls=s.lanes.map(l=>l.row+(l.water?'w':'')+(l.brain?'':'x')+(l.grave?'g':'')).join(',');
+  if(ls!==lanesSig){lanesSig=ls;const L=$('lanes');L.innerHTML='';s.lanes.forEach(l=>{const b=document.createElement('button');b.textContent=(l.row+1)+(l.grave&&s.graves?'+':'');b.dataset.row=l.row;if(l.water)b.classList.add('water');if(!l.brain)b.classList.add('lost');b.title=l.water?'agua':'tierra';b.addEventListener('click',()=>cmd('l='+l.row));L.appendChild(b);});}
+  $('lanes').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.row===s.lane));
+  const g=$('grave');g.hidden=!s.graves;g.classList.toggle('on',s.graveMode);g.textContent=s.graveMode?'Desde la tumba':'Tumba';
+  s.zombies.forEach(z=>{const b=buttons[z.i];if(!b)return;
+    b.classList.toggle('off',z.state!=='ok');b.classList.toggle('page',z.page===s.page);
+    b.querySelector('.cost').textContent=z.cost+' cerebros';
+    let w=why[z.state]||'';if(z.state==='fase')w='desde la fase '+z.phase;else if(z.state==='recarga')w='recarga '+z.rechargeLeft.toFixed(1)+' s';else if(z.state==='espera')w='en '+s.grace+' s';
+    b.querySelector('.why').textContent=w;b.querySelector('.bar').style.width=(z.recharge*100)+'%';});
+  const o=$('over');
+  if(s.over&&s.winner){o.style.display='flex';$('overTitle').textContent=s.winner==='zombis'?'Ganan los zombis':'Ganan las plantas';
+    const t=s.stats;$('overStats').innerHTML='<p>Zombis mandados: '+t.sent+'</p><p>Zombis matados: '+t.killed+'</p><p>Plantas comidas: '+t.plantsEaten+'</p><p>Cerebros comidos: '+t.brainsEaten+'/'+s.need+'</p><p>Tiempo: '+t.time+'</p>';}
+  else o.style.display='none';
+}
+let polling=false;
+async function poll(){if(polling)return;polling=true;try{const r=await fetch('/state?c='+code,{cache:'no-store'});if(r.ok)render(await r.json());}catch(e){}polling=false;}
+setInterval(poll,300);poll();
 </script></body></html>
 )HTML";
-		aPage.replace(aPage.find("{BUTTONS}"), 9, aButtons);
-		return aPage;
 	}
 
 	void HandleConnection(int theFd)
@@ -362,14 +452,28 @@ addEventListener('keydown',e=>{let k=keys[e.key];if(!k&&e.key>='1'&&e.key<='9')k
 		}
 		if (aPath == "/cmd")
 		{
-			int aKey = std::atoi(QueryValue(aQuery, "k").c_str());
-			if (IsZombieKey(aKey))
-			{
-				std::lock_guard<std::mutex> aLock(gKeyMutex);
-				if (gKeys.size() < MAX_QUEUED_KEYS)
-					gKeys.push_back(aKey);
-			}
+			// k=<key code>, z=<roster index> sends that zombie, l=<row> picks the lane
+			std::string aKey = QueryValue(aQuery, "k");
+			std::string aZombie = QueryValue(aQuery, "z");
+			std::string aLane = QueryValue(aQuery, "l");
+			if (!aKey.empty() && IsZombieKey(std::atoi(aKey.c_str())))
+				PushKey(std::atoi(aKey.c_str()));
+			else if (!aZombie.empty() && std::atoi(aZombie.c_str()) >= 0 && std::atoi(aZombie.c_str()) < ModVersus::MAX_ROSTER)
+				PushKey(ModVersus::NET_SEND + std::atoi(aZombie.c_str()));
+			else if (!aLane.empty() && std::atoi(aLane.c_str()) >= 0 && std::atoi(aLane.c_str()) < MAX_GRID_SIZE_Y)
+				PushKey(ModVersus::NET_LANE + std::atoi(aLane.c_str()));
 			SendResponse(theFd, "204 No Content", "text/plain", "");
+			close(theFd);
+			return;
+		}
+		if (aPath == "/state")
+		{
+			std::string aJson;
+			{
+				std::lock_guard<std::mutex> aLock(gStateMutex);
+				aJson = gStateJson;
+			}
+			SendResponse(theFd, "200 OK", "application/json; charset=utf-8", aJson);
 			close(theFd);
 			return;
 		}
@@ -711,7 +815,16 @@ void VersusNet::OnFrame()
 	}
 
 	if (gRunning)
+	{
 		Capture(aNow);
+		if (aNow - gLastState >= static_cast<uint32_t>(STATE_INTERVAL_MS))
+		{
+			gLastState = aNow;
+			std::string aJson = ModVersus::StateJson(aVersusBoard ? gLawnApp->mBoard : nullptr);
+			std::lock_guard<std::mutex> aLock(gStateMutex);
+			gStateJson.swap(aJson);
+		}
+	}
 }
 
 #endif
