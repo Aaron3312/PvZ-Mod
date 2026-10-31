@@ -80,6 +80,18 @@ SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy PVZ_MOD_TEST=1 PVZ_MOD_TEST_SHOTS=/
 - `=chooser` se queda en la página Mods del selector.
 - `PVZ_MOD_TEST_SHOTS` hace que el propio juego guarde capturas, así nunca se captura el escritorio.
 
+## Ver en AR (rama `feat/ar-view`)
+
+El jardín sale como un tablero apoyado en una mesa de verdad, visto con la cámara del celular (Chrome en Android, WebXR), y se juega tocándolo. El juego sigue corriendo en la Mac: el celular solo lo muestra y le manda los toques. No hay app ni ARCore en el APK.
+
+- **Encenderlo:** en el menú de trucos, sección **Ver en AR**, casilla «Ver en AR desde el celular» (se guarda como los demás trucos), o `PVZ_AR_VIEW=1`. Funciona en cualquier pantalla, menús incluidos, en el puerto **8092** (`PVZ_AR_PORT`) con un código propio de 6 letras. El código se guarda en el registro, así que el marcador del celular sirve de una vez para otra (`PVZ_AR_CODE` lo fija). Mientras nadie mira, la dirección y el código salen abajo en la pantalla del juego y en el menú de trucos; el celular no los ve.
+- **Con cable (lo más simple):** `adb reverse tcp:8092 tcp:8092` y en Chrome del celular `http://localhost:8092/ar?c=<código>`. WebXR solo funciona con https o en localhost, y por el cable la página cuenta como localhost.
+- **Sin cable:** con Tailscale en la Mac y en el celular, `tailscale serve --bg 8092` publica `https://<mac>.<tailnet>.ts.net/ar?c=<código>` con certificado válido, solo dentro del tailnet. Por la IP de la red local (`http://192.168…:8092/ar?c=…`) la página carga, pero sin AR: se juega en plano.
+- **La página:** primero muestra el juego en plano, que ya se juega con toques o con el ratón. Si el navegador tiene WebXR AR aparece **Entrar en AR**: se apunta a la mesa hasta que sale un círculo y un toque pone el tablero (40 cm de ancho, con marco de madera, el pasto un poco levantado y sombra). En **Ajustar** se arrastra con el dedo por la mesa, ▲▼ lo inclinan de 0° (acostado) a 60° (como una pantalla), «Girar 90» lo gira y −/+ cambian el tamaño. **Fijar** pasa a jugar: cada toque en el tablero es un clic en el juego (botón abajo, movimiento y arriba, así que también se puede arrastrar). **Recolocar** vuelve al círculo para ponerlo en otra superficie y **Salir** cierra la AR.
+- three.js 0.160.0 se carga de jsDelivr, así que el celular necesita internet aunque vaya por cable. Sin WebXR (escritorio, iPhone) la página se queda en plano con un aviso.
+- **Cómo está hecho:** `src/Mods/ARView.cpp` es un servidor propio, una copia recortada del de `VersusNet.cpp` (que no cambia), con su propia captura: `/ar` (la página, en `src/Mods/ARViewPage.h`), `/stream` (MJPEG, unas 16 imágenes por segundo), `/frame.jpg` (una sola imagen, por si el navegador no puede leer el stream) y `/click?a=down|up|move|tap&x=..&y=..` en coordenadas del juego (800×600). La página lee el stream con `fetch`, lo pinta en un canvas y ese canvas es la textura del tablero. Los clics esperan en una cola y entran en `SexyAppBase::ProcessDeferredMessages`, uno por llamada como los eventos de SDL, directo al `WidgetManager`. Un toque del celular cuenta como si la ventana tuviera el foco, porque los botones no responden sin él y el jugador no está tocando la Mac.
+- **Probarlo sin teléfono:** `PVZ_AR_VIEW=1 PVZ_AR_PORT=8093 PVZ_AR_CODE=prueba` y después `curl "localhost:8093/click?c=prueba&a=tap&x=400&y=300"` y `curl -o f.jpg "localhost:8093/frame.jpg?c=prueba"` (la primera vez da 503 y arranca la captura). Con `PVZ_MOD_TEST_SHOTS` el juego guarda una captura 0,7 s después de cada toque (`ar-tapNN-XxY.png`).
+
 ## Gráficos, sonidos y textos
 
 ```sh
