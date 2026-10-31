@@ -115,6 +115,16 @@ static bool gAppliedStateValid = false;
 static bool gAppliedTextureValid = false;
 static std::vector<GfxDrawCommand> gDrawCommands;
 
+// Offscreen drawing (BeginOffscreen): the texture keeps a real alpha, with the colors premultiplied
+static bool gOffscreen = false;
+static GLuint gOffscreenFbo = 0;
+static GLuint gOffscreenTexture = 0;
+static int gOffscreenTexWidth = 0;
+static int gOffscreenTexHeight = 0;
+static int gOffscreenWidth = 0;
+static int gOffscreenHeight = 0;
+static GLint gOffscreenPrevFbo = 0;
+
 static void GfxBegin(GLenum vertexMode)
 {
 	if (gVertexMode != (GLenum)-1) return;
@@ -136,7 +146,13 @@ static void SetMixedBlendMode(bool theEnabled)
 static void GfxApplyState(const GfxDrawState& state)
 {
 	if (!gAppliedStateValid || gAppliedState.blendSrc != state.blendSrc || gAppliedState.blendDst != state.blendDst)
-		glBlendFunc(state.blendSrc, state.blendDst);
+	{
+		// Offscreen the alpha accumulates as coverage; additive draws add light without covering anything.
+		if (gOffscreen)
+			glBlendFuncSeparate(state.blendSrc, state.blendDst, state.blendDst == GL_ONE ? GL_ZERO : GL_ONE, state.blendDst == GL_ONE ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA);
+		else
+			glBlendFunc(state.blendSrc, state.blendDst);
+	}
 	if (!gAppliedStateValid || gAppliedState.useTexture != state.useTexture)
 		glUniform1i(gUfUseTexture, state.useTexture);
 	if (!gAppliedStateValid || gAppliedState.mixedBlend != state.mixedBlend)
@@ -1375,6 +1391,122 @@ void GLInterface::Flush()
 	// Clear back buffer after swap (content undefined)
 	glClear(GL_COLOR_BUFFER_BIT);
 #endif // Emscripten: browser composites after rAF, no clear needed
+}
+
+bool GLInterface::BeginOffscreen(int theWidth, int theHeight)
+{
+	GfxFlush();
+	if (gOffscreen || theWidth <= 0 || theHeight <= 0 || theWidth > MAX_TEXTURE_SIZE || theHeight > MAX_TEXTURE_SIZE)
+		return false;
+	if (gOffscreenFbo == 0)
+	{
+		glGenFramebuffers(1, &gOffscreenFbo);
+		glGenTextures(1, &gOffscreenTexture);
+	}
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &gOffscreenPrevFbo);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, gOffscreenTexture);
+	gAppliedTextureValid = false;
+	if (theWidth > gOffscreenTexWidth || theHeight > gOffscreenTexHeight)
+	{
+		gOffscreenTexWidth = std::max(theWidth, gOffscreenTexWidth);
+		gOffscreenTexHeight = std::max(theHeight, gOffscreenTexHeight);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, gOffscreenTexWidth, gOffscreenTexHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, gOffscreenFbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gOffscreenTexture, 0);
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, gOffscreenPrevFbo);
+		return false;
+	}
+
+	gOffscreen = true;
+	gAppliedStateValid = false;
+	gOffscreenWidth = theWidth;
+	gOffscreenHeight = theHeight;
+	glViewport(0, 0, theWidth, theHeight);
+	float ortho[16];
+	MakeOrthoMatrix(0, (float)theWidth, (float)theHeight, 0, -10, 10, ortho);
+	glUseProgram(gProgram);
+	glUniformMatrix4fv(gUfViewProjMtx, 1, GL_FALSE, ortho);
+	glDisable(GL_SCISSOR_TEST);
+	glClearColor(0, 0, 0, 0);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glClearColor(0, 0, 0, 1);
+	glEnable(GL_SCISSOR_TEST);
+	glScissor(0, 0, theWidth, theHeight);
+	return true;
+}
+
+bool GLInterface::PendingBounds(float& theLeft, float& theTop, float& theRight, float& theBottom)
+{
+	if (gNumVertices <= 0)
+		return false;
+	theLeft = theRight = gVertices[0].sx;
+	theTop = theBottom = gVertices[0].sy;
+	for (int i = 1; i < gNumVertices; i++)
+	{
+		theLeft = std::min(theLeft, gVertices[i].sx);
+		theRight = std::max(theRight, gVertices[i].sx);
+		theTop = std::min(theTop, gVertices[i].sy);
+		theBottom = std::max(theBottom, gVertices[i].sy);
+	}
+	return true;
+}
+
+void GLInterface::MovePending(float theDX, float theDY)
+{
+	for (int i = 0; i < gNumVertices; i++)
+	{
+		gVertices[i].sx += theDX;
+		gVertices[i].sy += theDY;
+	}
+}
+
+void GLInterface::DropPending()
+{
+	GfxEnd();
+	gDrawCommands.clear();
+	gNumVertices = 0;
+}
+
+void GLInterface::FlushOffscreen(const Rect& theClip)
+{
+	if (!gOffscreen)
+		return;
+	GfxEnd();
+	glScissor(theClip.mX, gOffscreenHeight - theClip.mY - theClip.mHeight, std::max(0, theClip.mWidth), std::max(0, theClip.mHeight));
+	GfxSubmit();
+}
+
+void GLInterface::EndOffscreen(std::vector<unsigned char>* thePixels, int theWidth, int theHeight)
+{
+	if (!gOffscreen)
+		return;
+	GfxFlush();
+	glDisable(GL_SCISSOR_TEST);
+	if (thePixels)
+	{
+		theWidth = std::clamp(theWidth, 0, gOffscreenWidth);
+		theHeight = std::clamp(theHeight, 0, gOffscreenHeight);
+		thePixels->resize(static_cast<size_t>(theWidth) * theHeight * 4);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		// Bottom-up; the game's top rows are the texture's last ones
+		glReadPixels(0, gOffscreenHeight - theHeight, theWidth, theHeight, GL_RGBA, GL_UNSIGNED_BYTE, thePixels->data());
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, gOffscreenPrevFbo);
+	gOffscreen = false;
+	gAppliedStateValid = false;
+	gAppliedTextureValid = false;
+	glViewport(mPresentationRect.mX, mPresentationRect.mY, mPresentationRect.mWidth, mPresentationRect.mHeight);
+	float ortho[16];
+	MakeOrthoMatrix(0, (float)mWidth, (float)mHeight, 0, -10, 10, ortho);
+	glUniformMatrix4fv(gUfViewProjMtx, 1, GL_FALSE, ortho);
 }
 
 bool GLInterface::CreateImageTexture(MemoryImage *theImage)

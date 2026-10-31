@@ -45,6 +45,9 @@
 #include <algorithm>
 #include <format>
 #include "Mods/ModContent.h"
+#ifdef PVZ_HACK_MENU
+#include "Mods/ARView.h"
+#endif
 
 constinit const PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
 	{ .mSeedType = SeedType::SEED_PEASHOOTER,        .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_PEASHOOTER,    .mPacketIndex = 0,  .mSeedCost = 100, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "PEASHOOTER" },
@@ -3877,6 +3880,10 @@ Image* Plant::GetImage(SeedType theSeedType)
 
 void Plant::DrawShadow(Sexy::Graphics* g, float theOffsetX, float theOffsetY)
 {
+#ifdef PVZ_HACK_MENU
+	if (ARView::DrawingFigures())
+		return;	// the AR diorama lays its own shadows on the ground
+#endif
 	if (mSeedType == SeedType::SEED_LILYPAD || mSeedType == SeedType::SEED_STARFRUIT || mSeedType == SeedType::SEED_TANGLEKELP ||
 		mSeedType == SeedType::SEED_SEASHROOM || mSeedType == SeedType::SEED_COBCANNON || mSeedType == SeedType::SEED_SPIKEWEED ||
 		mSeedType == SeedType::SEED_SPIKEROCK || mSeedType == SeedType::SEED_GRAVEBUSTER || mSeedType == SeedType::SEED_CATTAIL ||

@@ -26,6 +26,9 @@
 #include "System/ReanimationLawn.h"
 #include "../PvzpLib/PvzpFoley.h"
 #include "../PvzpLib/Reanimator.h"
+#ifdef PVZ_HACK_MENU
+#include "../Mods/ARView.h"
+#endif
 
 void LawnMower::LawnMowerInitialize(int theRow)
 {
@@ -277,7 +280,12 @@ void LawnMower::Draw(Graphics* g)
 	if (!mVisible)
 		return;
 
-	if (mMowerHeight != MowerHeight::MOWER_HEIGHT_UP_TO_LAND &&
+	bool aShadow = true;
+#ifdef PVZ_HACK_MENU
+	aShadow = !ARView::DrawingFigures();	// the AR diorama lays its own shadows on the ground
+#endif
+	if (aShadow &&
+		mMowerHeight != MowerHeight::MOWER_HEIGHT_UP_TO_LAND &&
 		mMowerHeight != MowerHeight::MOWER_HEIGHT_DOWN_TO_POOL &&
 		mMowerHeight != MowerHeight::MOWER_HEIGHT_IN_POOL &&
 		mMowerState != LawnMowerState::MOWER_SQUISHED)

@@ -231,6 +231,17 @@ public:
 	bool					PreDraw();
 	void					Flush();
 
+	// Offscreen drawing (ARView's figures): until EndOffscreen, draws land in a texture theWidth x theHeight game
+	// pixels big, with alpha and the colors premultiplied. Draws are batched as usual: the pending vertices can be
+	// measured and moved before FlushOffscreen sends them, clipped to a rectangle. EndOffscreen reads the top-left
+	// part back (RGBA, bottom-up) and returns to the screen.
+	bool					BeginOffscreen(int theWidth, int theHeight);
+	bool					PendingBounds(float& theLeft, float& theTop, float& theRight, float& theBottom);
+	void					MovePending(float theDX, float theDY);
+	void					DropPending();
+	void					FlushOffscreen(const Rect& theClip);
+	void					EndOffscreen(std::vector<unsigned char>* thePixels, int theWidth, int theHeight);
+
 	bool					CreateImageTexture(MemoryImage* theImage);
 	bool					RecoverBits(MemoryImage* theImage);
 	void					Blt(Image* theImage, float theX, float theY, const Rect& theSrcRect, const Color& theColor, int theDrawMode, bool linearFilter = true);
