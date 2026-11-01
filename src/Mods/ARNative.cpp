@@ -106,6 +106,7 @@ namespace
 	float				gYaw = 0.0f;
 	float				gWidth = DEFAULT_WIDTH;
 	bool				gFloating = false;			// "Sin mesa" without tracking: it stays in front of the camera
+	float				gFloatAxes[9] = {};			// floating without tracking: the board's axes, from the camera's
 	bool				gReticleOk = false;
 	float				gReticle[3] = {};
 	bool				gHasPlane = false;
@@ -193,14 +194,17 @@ namespace
 	// Board to world: on its spot, turned around the vertical and scaled from the diorama's own width
 	void BoardModel(float out[16])
 	{
-		float aScale = gWidth / std::max(0.01f, ARDiorama::BoardWidth());
-		float c = std::cos(gYaw) * aScale, s = std::sin(gYaw) * aScale;
-		const float aModel[16] = {
-			c, 0, -s, 0,
-			0, aScale, 0, 0,
-			s, 0, c, 0,
+		float k = gWidth / std::max(0.01f, ARDiorama::BoardWidth());
+		float c = std::cos(gYaw), s = std::sin(gYaw);
+		float aModel[16] = {
+			c * k, 0, -s * k, 0,
+			0, k, 0, 0,
+			s * k, 0, c * k, 0,
 			gBoardPos[0], gBoardPos[1] + LAWN_LIFT * gWidth / DEFAULT_WIDTH, gBoardPos[2], 1,
 		};
+		if (gFloating && !gTracking)
+			for (int i = 0; i < 9; i++)
+				aModel[(i / 3) * 4 + i % 3] = gFloatAxes[i] * k;
 		std::memcpy(out, aModel, sizeof(aModel));
 	}
 
@@ -1182,9 +1186,31 @@ void main(){
 		const float f[3] = { -aCam[8], -aCam[9], -aCam[10] };	// forward
 		float aFlat = std::sqrt(f[0] * f[0] + f[2] * f[2]);
 		float fx = aFlat > 1e-3f ? f[0] / aFlat : 0.0f, fz = aFlat > 1e-3f ? f[2] / aFlat : -1.0f;
+		// Lying flat a little below the camera while ARCore tracks
 		thePos[0] = gEye[0] + fx * 0.5f;
 		thePos[1] = gEye[1] - 0.25f;
 		thePos[2] = gEye[2] + fz * 0.5f;
+		if (gTracking)
+			return;
+		// Without tracking the view stays put (a phone lying still): right ahead of the lens, seen from 55 degrees
+		// above as a table would be, its near edge at the bottom of the screen
+		const float r[3] = { aCam[0], aCam[1], aCam[2] }, u[3] = { aCam[4], aCam[5], aCam[6] }, b[3] = { aCam[8], aCam[9], aCam[10] };
+		const float e = 55.0f * PI / 180.0f;
+		float y[3], z[3];
+		for (int i = 0; i < 3; i++)
+		{
+			y[i] = b[i] * std::sin(e) + u[i] * std::cos(e);
+			thePos[i] = gEye[i] - b[i] * 0.42f;
+		}
+		z[0] = r[1] * y[2] - r[2] * y[1];
+		z[1] = r[2] * y[0] - r[0] * y[2];
+		z[2] = r[0] * y[1] - r[1] * y[0];
+		for (int i = 0; i < 3; i++)
+		{
+			gFloatAxes[i] = r[i];
+			gFloatAxes[3 + i] = y[i];
+			gFloatAxes[6 + i] = z[i];
+		}
 	}
 
 	void PlaceInFront()
@@ -1250,6 +1276,8 @@ void main(){
 		{
 			if (gTracking && gCameraLive)
 			{
+				FloatingPose(gBoardPos);
+				FaceThePlayer();
 				Anchor(gBoardPos);
 				gFloating = !gAnchor;
 			}
