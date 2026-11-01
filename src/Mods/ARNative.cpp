@@ -41,6 +41,7 @@ namespace
 	constexpr uint32_t	ROTATION_CHECK_MS = 400;
 	constexpr uint32_t	TAP_DELAY_MS = 90;			// a finger waits this long in case more follow (the menu's 3 fingers)
 	constexpr uint32_t	NOTICE_MS = 8000;
+	constexpr uint32_t	IDLE_PAUSE_MS = 90000;		// this long outside a lawn and the camera stops until the next one
 	constexpr float		DEFAULT_WIDTH = 0.40f;		// the board's width on the table, meters
 	constexpr float		MIN_WIDTH = 0.15f;
 	constexpr float		MAX_WIDTH = 1.60f;
@@ -98,6 +99,8 @@ namespace
 	bool				gTracking = false;
 	ArTrackingFailureReason	gFailure = AR_TRACKING_FAILURE_REASON_NONE;
 	bool				gShowing = false;			// the AR view covers the screen this frame
+	uint32_t			gHiddenSince = 0;			// when the last lawn ended
+	bool				gIdlePaused = false;
 
 	Mode				gMode = Mode::PLACE;
 	bool				gPlaced = false;
@@ -483,8 +486,8 @@ void main(){
 		return true;
 	}
 
-	// ARCore draws with GLES 3 and leaves its own vertex array object bound after an update. The game's attribute
-	// pointers live in the default one (it is GLES 2 code), so that one is put back.
+	// The game's attribute pointers live in the default vertex array object (it is GLES 2 code); ARCore's GLES 3
+	// work must not leave another one bound.
 	using BindVertexArrayProc = void (*)(GLuint);
 	BindVertexArrayProc BindVertexArray()
 	{
@@ -497,73 +500,24 @@ void main(){
 		return sProc;
 	}
 
-	// ARCore's update runs GLES 3 work of its own in the game's context (the camera image for its depth model) and
-	// doesn't put everything back. GLES 3 state the game never touches goes back to its defaults; a pixel unpack
-	// buffer left bound, for one, makes every texture the game uploads come out empty.
+	// ARCore's update runs GLES 3 work of its own in the game's context (the camera image for its depth model). GLES 3
+	// state the game never sets goes back to its defaults in case it is left behind: a pixel unpack buffer still
+	// bound, for one, would make every texture the game uploads come out empty.
 	void ResetAfterARCore()
 	{
-		struct Check
-		{
-			const char*	mName;
-			GLenum		mWhat;
-			GLint		mDefault;
-		};
-		static const Check sChecks[] = {
-			{ "pixel unpack buffer", 0x88EF, 0 },	// GL_PIXEL_UNPACK_BUFFER_BINDING
-			{ "pixel pack buffer", 0x88ED, 0 },		// GL_PIXEL_PACK_BUFFER_BINDING
-			{ "unpack row length", 0x0CF2, 0 },
-			{ "unpack skip rows", 0x0CF3, 0 },
-			{ "unpack skip pixels", 0x0CF4, 0 },
-			{ "pack row length", 0x0D02, 0 },
-			{ "sampler", 0x8919, 0 },				// GL_SAMPLER_BINDING
-			{ "stencil test", GL_STENCIL_TEST, 0 },
-			{ "rasterizer discard", 0x8C89, 0 },
-			{ "polygon offset", GL_POLYGON_OFFSET_FILL, 0 },
-			{ "draw framebuffer", 0x8CA6, 0 },		// GL_DRAW_FRAMEBUFFER_BINDING
-			{ "read framebuffer", 0x8CAA, 0 },		// GL_READ_FRAMEBUFFER_BINDING
-		};
-		static int sLogged = 0;
-		for (const Check& c : sChecks)
-		{
-			GLint aValue = 0;
-			if (c.mWhat == GL_STENCIL_TEST || c.mWhat == 0x8C89 || c.mWhat == GL_POLYGON_OFFSET_FILL)
-				aValue = glIsEnabled(c.mWhat);
-			else
-				glGetIntegerv(c.mWhat, &aValue);
-			if (aValue != c.mDefault && sLogged < 12)
-			{
-				sLogged++;
-				PvzpLogLn("ARNative: update left {} at {}", c.mName, aValue);
-			}
-		}
-		GLboolean aMask[4] = { 1, 1, 1, 1 };
-		glGetBooleanv(GL_COLOR_WRITEMASK, aMask);
-		if (!(aMask[0] && aMask[1] && aMask[2] && aMask[3]) && sLogged < 12)
-		{
-			sLogged++;
-			PvzpLogLn("ARNative: update left the color mask at {}{}{}{}", aMask[0], aMask[1], aMask[2], aMask[3]);
-		}
-		glGetError();	// a GLES 2 driver would refuse some of the names above
 		glBindBuffer(0x88EC, 0);	// GL_PIXEL_UNPACK_BUFFER
 		glBindBuffer(0x88EB, 0);	// GL_PIXEL_PACK_BUFFER
-		glPixelStorei(0x0CF2, 0);
-		glPixelStorei(0x0CF3, 0);
-		glPixelStorei(0x0CF4, 0);
-		glPixelStorei(0x0D02, 0);
-		glPixelStorei(0x0D03, 0);
-		glPixelStorei(0x0D04, 0);
+		for (GLenum aName : { 0x0CF2, 0x0CF3, 0x0CF4, 0x0D02, 0x0D03, 0x0D04 })	// row lengths and skips
+			glPixelStorei(aName, 0);
 		using BindSamplerProc = void (*)(GLuint, GLuint);
 		static BindSamplerProc sBindSampler = reinterpret_cast<BindSamplerProc>(SDL_GL_GetProcAddress("glBindSampler"));
 		if (sBindSampler)
-			for (GLuint i = 0; i < 4; i++)
-				sBindSampler(i, 0);
+			sBindSampler(0, 0);
 		glDisable(GL_STENCIL_TEST);
 		glDisable(0x8C89);	// GL_RASTERIZER_DISCARD
 		glDisable(GL_POLYGON_OFFSET_FILL);
-		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-		glDisable(GL_SAMPLE_COVERAGE);
 		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-		glGetError();
+		glGetError();	// a GLES 2 context refuses the GLES 3 names
 	}
 
 	// The game sets its program, buffer and attribute pointers once and relies on them, like ImGui's backend does
@@ -909,6 +863,8 @@ void main(){
 		gShowing = false;
 		gTracking = false;
 		gResumeWanted = false;
+		gIdlePaused = false;
+		gHiddenSince = 0;
 	}
 
 	// The game goes to the background (the home button, another app): the camera is released until it comes back.
@@ -917,7 +873,7 @@ void main(){
 		if (theEvent->type == SDL_APP_WILLENTERBACKGROUND)
 		{
 			gInBackground = true;
-			if (gSession && gState == State::RUNNING)
+			if (gSession && gState == State::RUNNING && !gIdlePaused)
 			{
 				ArSession_pause(gSession);
 				PvzpLogLn("ARNative: paused");
@@ -926,7 +882,7 @@ void main(){
 		else if (theEvent->type == SDL_APP_DIDENTERFOREGROUND)
 		{
 			gInBackground = false;
-			gResumeWanted = gSession != nullptr;
+			gResumeWanted = gSession != nullptr && !gIdlePaused;
 		}
 		return 0;
 	}
@@ -1666,6 +1622,28 @@ void ARNative::OnFrame()
 			return;
 	}
 
+	// In menus for long the camera rests (battery, and Android's camera dot); the next lawn wakes it
+	ARDiorama::Update(gLawnApp, aNow, SCENE_INTERVAL_MS);
+	bool aShowing = ARDiorama::HasScene();
+	if (aShowing)
+		gHiddenSince = 0;
+	else if (gHiddenSince == 0)
+		gHiddenSince = std::max<uint32_t>(1, aNow);
+	if (!gIdlePaused && !aShowing && aNow - gHiddenSince >= IDLE_PAUSE_MS)
+	{
+		ArSession_pause(gSession);
+		gIdlePaused = true;
+		gCameraLive = false;
+		PvzpLogLn("ARNative: no lawn for a while, the camera rests");
+	}
+	if (gIdlePaused)
+	{
+		if (!aShowing)
+			return;
+		gIdlePaused = false;
+		gResumeWanted = true;
+	}
+
 	if (gResumeWanted)
 	{
 		gResumeWanted = false;
@@ -1677,25 +1655,14 @@ void ARNative::OnFrame()
 		EndTouches();
 	}
 	UpdateGeometry(aNow);
-	// ARCore may do GL work of its own in update; the game's context and surface must be current again after it
 	LogGLError("the game's frame");
+	// ARCore may do GL work of its own in update; the game's context and surface must be current again after it
 	constexpr int32_t EGL_DRAW_SURFACE = 0x3059, EGL_READ_SURFACE = 0x305A;
 	void* aDisplay = eglGetCurrentDisplay();
 	void* aContext = eglGetCurrentContext();
 	void* aDraw = eglGetCurrentSurface(EGL_DRAW_SURFACE);
 	void* aRead = eglGetCurrentSurface(EGL_READ_SURFACE);
 	ArStatus aStatus = (sDebug & 1) ? AR_ERROR_NOT_TRACKING : ArSession_update(gSession, gFrame);
-	static int sVaoLogs = 0;
-	if (sVaoLogs < 3 && BindVertexArray())
-	{
-		GLint aVertexArray = 0;
-		glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &aVertexArray);
-		if (aVertexArray != aBackup.mVertexArray)
-		{
-			sVaoLogs++;
-			PvzpLogLn("ARNative: update left vertex array {} bound (the game's is {})", aVertexArray, aBackup.mVertexArray);
-		}
-	}
 	aBackup.RestoreVertexArray();
 	ResetAfterARCore();
 	if (eglGetCurrentContext() != aContext || eglGetCurrentSurface(EGL_DRAW_SURFACE) != aDraw || eglGetCurrentSurface(EGL_READ_SURFACE) != aRead)
@@ -1724,9 +1691,6 @@ void ARNative::OnFrame()
 		PlaceInFront();
 	}
 
-	// The diorama reads the 2D frame the game just drew, so it updates before the camera covers it
-	ARDiorama::Update(gLawnApp, aNow, SCENE_INTERVAL_MS);
-	bool aShowing = ARDiorama::HasScene();
 	if (aShowing != gShowing)
 	{
 		PvzpLogLn("ARNative: {}", aShowing ? "lawn in play, AR view" : "no lawn, 2D view");
