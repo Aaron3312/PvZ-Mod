@@ -54,6 +54,7 @@ namespace
 		{ "ModFreezeZombies", &gSettings.mFreezeZombies },
 		{ "ModOneHitKill", &gSettings.mOneHitKill },
 		{ "ModInfiniteCoins", &gSettings.mInfiniteCoins },
+		{ "ModARDiorama", &gSettings.mARDiorama },
 		{ "ModARView", &gSettings.mARView },
 	};
 

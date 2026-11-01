@@ -34,6 +34,7 @@
 #ifdef PVZ_HACK_MENU
 #include "Mods/HackMenu.h"
 #include "Mods/ARView.h"
+#include "Mods/ARDioramaPreview.h"
 #endif
 
 #ifdef __EMSCRIPTEN__
@@ -628,7 +629,7 @@ bool SexyAppBase::ProcessDeferredMessages(bool singleMessage)
 		}
 
 #ifdef PVZ_HACK_MENU
-		if (HackMenu::ProcessEvent(event))
+		if (HackMenu::ProcessEvent(event) || ARDioramaPreview::ProcessEvent(event))
 			return SDL_HasEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
 #endif
 

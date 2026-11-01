@@ -2,6 +2,7 @@
 #include "HackMenu.h"
 #include "VersusNet.h"
 #include "ARView.h"
+#include "ARDioramaPreview.h"
 #include "Mods.h"
 #include "LawnApp.h"
 #include "Lawn/Board.h"
@@ -314,6 +315,8 @@ namespace
 			std::string aHint = ARView::HintText();
 			if (!aHint.empty())
 				ImGui::TextWrapped("%s", aHint.c_str());
+			aChanged |= ImGui::Checkbox("Diorama 3D en la ventana", &s.mARDiorama);
+			ImGui::SetItemTooltip("El jardin en 3D aqui mismo: arrastra para girar, rueda para acercar, clic para jugar");
 		}
 
 		ImGui::PopItemWidth();
@@ -396,6 +399,7 @@ void HackMenu::Render()
 {
 	VersusNet::OnFrame();	// before the menu is drawn, so the other computer doesn't see it
 	ARView::OnFrame();
+	ARDioramaPreview::OnFrame();	// after the phone's capture, before the shots: they see the diorama
 
 	if (!gScreenshotPath.empty() && gLawnApp && gLawnApp->mWindow)
 	{

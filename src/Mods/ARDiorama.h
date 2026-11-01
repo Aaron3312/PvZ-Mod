@@ -24,13 +24,27 @@ namespace ARDiorama
 	// Width of the board at scale 1, in meters (the depth follows the lawn's aspect).
 	float	BoardWidth();
 
+	// How far the wooden base reaches below the lawn at scale 1, in meters: to stand it on a table at y = 0, lift
+	// the board by BaseHeight() times its scale (theModel = anchor * translate(0, s * BaseHeight(), 0) * turn * scale(s)).
+	float	BaseHeight();
+
 	// Draws the diorama: theModel is board to world (placement, turn and size), theView world to eye, theProj eye
 	// to clip. Depth test on; it doesn't clear and leaves the GL state as the game expects.
 	void	Draw(const float theModel[16], const float theView[16], const float theProj[16]);
 
-	// A tap along a world-space ray. True with the game coordinates (800x600) to click when the ray hits a sun or
-	// coin card, the seed bank panel, a plant or grave card, or the lawn, in that order of preference.
+	// A tap along a world-space ray (theDir need not be normalized). True with the game coordinates (800x600) to
+	// click when the ray hits a sun or coin card, the seed bank panel, a plant or grave card, or the lawn, in that
+	// order of preference.
 	bool	Pick(const float theModel[16], const float theOrigin[3], const float theDir[3], int* theGameX, int* theGameY);
+
+	// For the desktop preview (ARDioramaPreview.cpp): a round table of theRadius meters at world y = 0, under the board.
+	void	DrawTable(const float theView[16], const float theProj[16], float theRadius);
+
+	// For tests, points of the board's own space in meters: where the game point (theGameX, theGameY) lies on the
+	// lawn or on the seed bank panel, and the middle of the first sun or coin card that takes a tap.
+	bool	LawnPoint(int theGameX, int theGameY, float thePoint[3]);
+	bool	PanelPoint(int theGameX, int theGameY, float thePoint[3]);
+	bool	CoinPoint(float thePoint[3], int* theClickX = nullptr, int* theClickY = nullptr);
 }
 
 #endif

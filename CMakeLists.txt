@@ -137,6 +137,8 @@ if(PVZ_HACK_MENU)
 		src/Mods/VersusNet.cpp
 		src/Mods/ARView.cpp
 		src/Mods/ARScene.cpp
+		src/Mods/ARDiorama.cpp
+		src/Mods/ARDioramaPreview.cpp
 		${IMGUI_DIR}/imgui.cpp
 		${IMGUI_DIR}/imgui_draw.cpp
 		${IMGUI_DIR}/imgui_tables.cpp

@@ -19,6 +19,7 @@ struct ModSettings
 	int		mDamagePercent = 100;			// 10..2000
 	int		mZombieHealthPercent = 100;		// 10..1000, applied when a zombie is created
 	int		mSpeed = 1;						// game updates per frame, 1..10
+	bool	mARDiorama = false;				// the lawn as a 3D diorama in the game's window (ARDioramaPreview.cpp)
 	bool	mARView = false;				// serve the game to a phone in AR (ARView.cpp)
 };
 
