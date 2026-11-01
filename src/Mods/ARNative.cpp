@@ -1267,6 +1267,8 @@ void main(){
 
 	void SendMouse(ARView::Mouse theAction, int theX, int theY)
 	{
+		if (theAction == ARView::Mouse::DOWN)
+			PvzpLogLn("ARNative: click at {},{}", theX, theY);
 		ARView::QueueMouse(theAction, theX, theY);
 	}
 
