@@ -234,8 +234,9 @@ public:
 	// Offscreen drawing (ARView's figures): until EndOffscreen, draws land in a texture theWidth x theHeight game
 	// pixels big, with alpha and the colors premultiplied. Draws are batched as usual: the pending vertices can be
 	// measured and moved before FlushOffscreen sends them, clipped to a rectangle. EndOffscreen reads the top-left
-	// part back (RGBA, bottom-up) and returns to the screen.
-	bool					BeginOffscreen(int theWidth, int theHeight);
+	// part back (RGBA, bottom-up) and returns to the screen. theTarget is a texture of the caller's, at least that
+	// big, to draw into instead of the shared one (game row y lands on its row theHeight - 1 - y).
+	bool					BeginOffscreen(int theWidth, int theHeight, GLuint theTarget = 0);
 	bool					PendingBounds(float& theLeft, float& theTop, float& theRight, float& theBottom);
 	void					MovePending(float theDX, float theDY);
 	void					DropPending();

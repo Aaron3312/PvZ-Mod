@@ -1393,7 +1393,7 @@ void GLInterface::Flush()
 #endif // Emscripten: browser composites after rAF, no clear needed
 }
 
-bool GLInterface::BeginOffscreen(int theWidth, int theHeight)
+bool GLInterface::BeginOffscreen(int theWidth, int theHeight, GLuint theTarget)
 {
 	GfxFlush();
 	if (gOffscreen || theWidth <= 0 || theHeight <= 0 || theWidth > MAX_TEXTURE_SIZE || theHeight > MAX_TEXTURE_SIZE)
@@ -1405,9 +1405,9 @@ bool GLInterface::BeginOffscreen(int theWidth, int theHeight)
 	}
 	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &gOffscreenPrevFbo);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, gOffscreenTexture);
+	glBindTexture(GL_TEXTURE_2D, theTarget ? theTarget : gOffscreenTexture);
 	gAppliedTextureValid = false;
-	if (theWidth > gOffscreenTexWidth || theHeight > gOffscreenTexHeight)
+	if (!theTarget && (theWidth > gOffscreenTexWidth || theHeight > gOffscreenTexHeight))
 	{
 		gOffscreenTexWidth = std::max(theWidth, gOffscreenTexWidth);
 		gOffscreenTexHeight = std::max(theHeight, gOffscreenTexHeight);
@@ -1418,7 +1418,7 @@ bool GLInterface::BeginOffscreen(int theWidth, int theHeight)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, gOffscreenFbo);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gOffscreenTexture, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, theTarget ? theTarget : gOffscreenTexture, 0);
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, gOffscreenPrevFbo);

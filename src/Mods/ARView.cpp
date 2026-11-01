@@ -1,20 +1,12 @@
 #include "ARView.h"
+#include "ARScene.h"
 #include "Mods.h"
 #include "HackMenu.h"
 #include "LawnApp.h"
 #include "Lawn/Board.h"
-#include "Lawn/Coin.h"
-#include "Lawn/GridItem.h"
-#include "Lawn/LawnMower.h"
-#include "Lawn/MessageWidget.h"
-#include "Lawn/Plant.h"
-#include "Lawn/Projectile.h"
-#include "Lawn/Zombie.h"
 #include "PvzpLib/PvzpDebug.h"
-#include "SexyAppFramework/graphics/GLImage.h"
 #include "SexyAppFramework/graphics/GLInterface.h"
 #include "SexyAppFramework/graphics/GLPlatform.h"
-#include "SexyAppFramework/graphics/Graphics.h"
 #include "SexyAppFramework/widget/WidgetManager.h"
 #include <SDL.h>
 
@@ -41,7 +33,7 @@ bool ARView::HasViewer()
 
 bool ARView::DrawingFigures()
 {
-	return false;
+	return ARScene::DrawingFigures();
 }
 
 #else
@@ -84,18 +76,12 @@ namespace
 	constexpr uint32_t	RETRY_LISTEN_MS = 5000;
 	constexpr uint32_t	SHOT_DELAY_MS = 700;
 
-	// The diorama (/scene): while a lawn is in play every object is drawn alone into an atlas, so the page can stand
-	// it up on a 3D lawn. Colors (premultiplied) and alpha go side by side in one JPEG.
+	// The diorama (/scene): while a lawn is in play every object is drawn alone into an atlas (ARScene), so the
+	// page can stand it up on a 3D lawn. Colors (premultiplied) and alpha go side by side in one JPEG.
 	constexpr uint32_t	SCENE_INTERVAL_MS = 85;		// about 11 updates a second
-	constexpr int		ATLAS_WIDTH = 1024;
-	constexpr int		ATLAS_MAX_HEIGHT = 2048;
-	constexpr int		ATLAS_PAD = 3;
-	constexpr int		ATLAS_HEIGHT_STEP = 64;		// fewer texture sizes on the phone
-	constexpr int		FIGURE_MAX_WIDTH = 480;
-	constexpr int		FIGURE_MAX_HEIGHT = 560;
-	constexpr int		FIGURE_PROBE = 4096;		// drawn around here first, far from any clipping, then moved into the atlas
-	constexpr int		BACKDROP_WIDTH = 1400;		// the whole background picture, from the house to the street
-	constexpr int		BACKDROP_HEIGHT = 600;
+	using ARScene::ATLAS_WIDTH;
+	using ARScene::BACKDROP_WIDTH;
+	using ARScene::BACKDROP_HEIGHT;
 	constexpr uint32_t	BACKDROP_INTERVAL_MS = 3000;
 	constexpr int		ATLAS_JPEG_QUALITY = 80;
 	constexpr int		BACKDROP_JPEG_QUALITY = 80;
@@ -186,14 +172,12 @@ namespace
 	uint64_t			gSceneNumber = 0;
 	std::shared_ptr<const std::vector<unsigned char>> gBackdrop;
 	uint32_t			gBackdropNumber = 0;
-	bool				gDrawingFigures = false;	// game thread only
 	uint32_t			gLastScene = 0;				// game thread only, from here on
 	uint32_t			gLastBackdrop = 0;
 	uint32_t			gBackdropHash = 0;
 	uint32_t			gBackdropSerial = 0;
 	const Board*		gBackdropBoard = nullptr;
 	int					gBackdropType = -1;
-	std::unique_ptr<GLImage> gCanvas;				// a big destination, so figures drawn at the probe aren't clipped
 	int					gAtlasHeight = 0;			// grows at once, shrinks after a while: the phone reallocates its texture
 	uint32_t			gAtlasShrinkSince = 0;
 
@@ -784,12 +768,9 @@ namespace
 		PvzpLogLn("ARView: stopped");
 	}
 
-	// At exit the GL interface is gone before the statics are destroyed, and the canvas would reach it from its
-	// destructor (RemoveGLImage on a dead mutex aborted the game on quit). It is left alone then.
 	void StopAtExit()
 	{
 		Stop();
-		gCanvas.release();
 	}
 
 	void Start(uint32_t theNow)
@@ -877,169 +858,19 @@ namespace
 		gEncodeCond.notify_one();
 	}
 
-	// The lawn the diorama can show: in play, no dialog over it, one of the five outdoor backgrounds, no boss. Not
-	// in fog yet: the diorama has no fog, so it would show the zombies the fog hides.
-	Board* SceneBoard()
+	std::string FigureJson(const ARScene::Figure& theFigure)
 	{
-		Board* aBoard = gLawnApp->mBoard;
-		if (!aBoard || gLawnApp->mGameScene != GameScenes::SCENE_PLAYING || gLawnApp->GetDialogCount() > 0 || aBoard->StageHasFog())
-			return nullptr;
-		if (aBoard->mBackground < BackgroundType::BACKGROUND_1_DAY || aBoard->mBackground > BackgroundType::BACKGROUND_5_ROOF)
-			return nullptr;
-		if (gLawnApp->IsFinalBossLevel() || aBoard->mX != 0 || aBoard->mY != 0)
-			return nullptr;
-		return aBoard;
-	}
-
-	struct Figure
-	{
-		std::string	mId;
-		char		mKind = ' ';
-		int			mRow = 0;
-		float		mFeetX = 0;		// where it stands on the ground, in game coordinates
-		float		mFeetY = 0;
-		Rect		mAtlas;
-		int			mGameX = 0;		// the atlas rectangle's top-left on the game's screen
-		int			mGameY = 0;
-		int			mFacing = 1;
-		int			mOrder = 0;
-		int			mClickX = -1;	// where a tap on it clicks, -1 for nowhere
-		int			mClickY = -1;
-	};
-
-	// Draws objects alone: first around the probe point, then measures what was drawn, moves it into the next free
-	// place of the atlas and sends it clipped there.
-	class Painter
-	{
-	public:
-		GLInterface*	mGL;
-		Graphics		mBase;
-		int				mX = ATLAS_PAD;
-		int				mY = ATLAS_PAD;
-		int				mShelf = 0;
-		int				mSkipped = 0;
-
-		Painter(GLInterface* theGL) : mGL(theGL), mBase(gCanvas.get())
-		{
-			mBase.SetLinearBlend(true);
-		}
-
-		int UsedHeight() const
-		{
-			int aHeight = mY + mShelf + ATLAS_PAD;
-			return std::min(ATLAS_MAX_HEIGHT, (aHeight + ATLAS_HEIGHT_STEP - 1) / ATLAS_HEIGHT_STEP * ATLAS_HEIGHT_STEP);
-		}
-
-		template <class T> bool Measure(T theDraw, float& theLeft, float& theTop, float& theRight, float& theBottom)
-		{
-			mGL->DropPending();
-			Graphics g(mBase);
-			g.mTransX = FIGURE_PROBE;
-			g.mTransY = FIGURE_PROBE;
-			theDraw(&g);
-			bool aDrawn = mGL->PendingBounds(theLeft, theTop, theRight, theBottom);
-			mGL->DropPending();
-			theLeft -= FIGURE_PROBE;
-			theRight -= FIGURE_PROBE;
-			theTop -= FIGURE_PROBE;
-			theBottom -= FIGURE_PROBE;
-			return aDrawn;
-		}
-
-		// A panel (thePanel) keeps only what is on the game's screen, as wide as the atlas allows; a figure keeps the
-		// part around its middle and bottom when it is too big.
-		template <class T> bool Paint(T theDraw, Figure& theFigure, bool thePanel = false)
-		{
-			mGL->DropPending();
-			Graphics g(mBase);
-			g.mTransX = FIGURE_PROBE;
-			g.mTransY = FIGURE_PROBE;
-			theDraw(&g);
-			float l, t, r, b;
-			if (!mGL->PendingBounds(l, t, r, b))
-				return false;
-			int x0 = static_cast<int>(std::floor(l)), y0 = static_cast<int>(std::floor(t));
-			int x1 = static_cast<int>(std::ceil(r)), y1 = static_cast<int>(std::ceil(b));
-			if (thePanel)
-			{
-				x0 = std::max(x0, FIGURE_PROBE);
-				y0 = std::max(y0, FIGURE_PROBE);
-				x1 = std::min({ x1, FIGURE_PROBE + BOARD_WIDTH, x0 + ATLAS_WIDTH - 2 * ATLAS_PAD });
-				y1 = std::min(y1, FIGURE_PROBE + BOARD_HEIGHT);
-			}
-			if (x1 - x0 > FIGURE_MAX_WIDTH && !thePanel)
-			{
-				x0 = (x0 + x1 - FIGURE_MAX_WIDTH) / 2;
-				x1 = x0 + FIGURE_MAX_WIDTH;
-			}
-			if (y1 - y0 > FIGURE_MAX_HEIGHT)
-				y0 = y1 - FIGURE_MAX_HEIGHT;	// the bottom is what stands on the lawn
-			int aWidth = x1 - x0, aHeight = y1 - y0;
-			if (aWidth <= 0 || aHeight <= 0)
-			{
-				mGL->DropPending();
-				return false;
-			}
-			if (mX + aWidth + ATLAS_PAD > ATLAS_WIDTH)
-			{
-				mX = ATLAS_PAD;
-				mY += mShelf + ATLAS_PAD;
-				mShelf = 0;
-			}
-			if (mY + aHeight + ATLAS_PAD > ATLAS_MAX_HEIGHT)
-			{
-				mGL->DropPending();
-				mSkipped++;
-				return false;
-			}
-			mGL->MovePending(static_cast<float>(mX - x0), static_cast<float>(mY - y0));
-			theFigure.mAtlas = Rect(mX, mY, aWidth, aHeight);
-			mGL->FlushOffscreen(theFigure.mAtlas);
-			theFigure.mGameX = x0 - FIGURE_PROBE;
-			theFigure.mGameY = y0 - FIGURE_PROBE;
-			mX += aWidth + ATLAS_PAD;
-			mShelf = std::max(mShelf, aHeight);
-			return true;
-		}
-	};
-
-	std::string FigureJson(const Figure& theFigure)
-	{
-		return std::format("[\"{}\",\"{}\",{},{:.1f},{:.1f},{},{},{},{},{:.1f},{:.1f},{},{},{},{}]", theFigure.mId, theFigure.mKind, theFigure.mRow,
+		return std::format("[\"{}{}\",\"{}\",{},{:.1f},{:.1f},{},{},{},{},{:.1f},{:.1f},{},{},{},{}]", theFigure.mKind, theFigure.mIndex, theFigure.mKind, theFigure.mRow,
 			theFigure.mFeetX, theFigure.mFeetY, theFigure.mAtlas.mX, theFigure.mAtlas.mY, theFigure.mAtlas.mWidth, theFigure.mAtlas.mHeight,
 			theFigure.mFeetX - theFigure.mGameX, theFigure.mFeetY - theFigure.mGameY, theFigure.mFacing, theFigure.mOrder, theFigure.mClickX, theFigure.mClickY);
 	}
 
 	// A flat piece of the screen (the seed bank, the level's progress, a message): its atlas rectangle and where
 	// it is on the game's screen.
-	std::string PanelJson(const Figure& theFigure)
+	std::string PanelJson(const ARScene::Figure& theFigure)
 	{
 		return std::format("[{},{},{},{},{},{}]", theFigure.mAtlas.mX, theFigure.mAtlas.mY, theFigure.mAtlas.mWidth, theFigure.mAtlas.mHeight,
 			theFigure.mGameX, theFigure.mGameY);
-	}
-
-	// The background with what lies flat on it (ice, craters), from the house to the street.
-	bool PaintBackdrop(GLInterface* theGL, Board* theBoard, std::vector<unsigned char>& thePixels)
-	{
-		if (!theGL->BeginOffscreen(BACKDROP_WIDTH, BACKDROP_HEIGHT))
-			return false;
-		Graphics g(gCanvas.get());
-		g.SetLinearBlend(true);
-		g.mTransX = BOARD_OFFSET;
-		theBoard->DrawBackdrop(&g);
-		for (GridItem* aGridItem : theBoard->mGridItems)
-		{
-			if (!aGridItem->mDead && aGridItem->mGridItemType == GridItemType::GRIDITEM_CRATER)
-				aGridItem->DrawGridItem(&g);
-		}
-		for (int aRow = 0; aRow < MAX_GRID_SIZE_Y; aRow++)
-		{
-			if (theBoard->mIceTimer[aRow])
-				theBoard->DrawIce(&g, aRow);
-		}
-		theGL->FlushOffscreen(Rect(0, 0, BACKDROP_WIDTH, BACKDROP_HEIGHT));
-		theGL->EndOffscreen(&thePixels, BACKDROP_WIDTH, BACKDROP_HEIGHT);
-		return true;
 	}
 
 	uint32_t SampleHash(const std::vector<unsigned char>& thePixels)
@@ -1050,222 +881,11 @@ namespace
 		return aHash;
 	}
 
-	// Every object of the lawn into the atlas, and the scene's json; returns the atlas height used.
-	int PaintFigures(GLInterface* theGL, Board* theBoard, uint32_t theNow, std::vector<Figure>& theFigures, std::string& theJson)
+	// The scene's json; returns the atlas height to send, which grows at once and shrinks after a while.
+	int SceneJson(const ARScene::Scene& theScene, uint32_t theNow, std::string& theJson)
 	{
-		Painter aPainter(theGL);
-		Figure aHud, aMeter, aMessage;
-		bool aHasHud = aPainter.Paint([&](Graphics* g) {
-			theBoard->DrawUIBottom(g);
-			if (theBoard->StageHasFog())
-				theBoard->DrawTopRightUI(g);
-		}, aHud, true);
-		bool aHasMeter = aPainter.Paint([&](Graphics* g) {
-			theBoard->DrawProgressMeter(g);
-			theBoard->DrawLevel(g);
-		}, aMeter, true);
-		bool aHasMessage = aPainter.Paint([&](Graphics* g) { theBoard->mAdvice->Draw(g); }, aMessage, true);
-		bool aWhack = gLawnApp->IsWhackAZombieLevel();
-
-		for (Zombie* aZombie : theBoard->mZombies)
-		{
-			if (aZombie->mDead || aZombie->mZombieType == ZombieType::ZOMBIE_BOSS)
-				continue;
-			Figure aFigure;
-			if (!aPainter.Paint([&](Graphics* g) {
-					if (aZombie->BeginDraw(g))
-					{
-						aZombie->Draw(g);
-						aZombie->EndDraw(g);
-					}
-				}, aFigure))
-				continue;
-			// It stands where its shadow is, which stays on the ground while it jumps, flies or climbs
-			float l, t, r, b;
-			if (aZombie->HasShadow() && aPainter.Measure([&](Graphics* g) {
-					if (aZombie->BeginDraw(g))
-					{
-						aZombie->DrawShadow(g);
-						aZombie->EndDraw(g);
-					}
-				}, l, t, r, b))
-			{
-				aFigure.mFeetX = (l + r) / 2;
-				aFigure.mFeetY = (t + b) / 2;
-			}
-			else
-			{
-				aFigure.mFeetX = aFigure.mGameX + aFigure.mAtlas.mWidth / 2.0f;
-				aFigure.mFeetY = static_cast<float>(aFigure.mGameY + aFigure.mAtlas.mHeight);
-			}
-			aFigure.mId = std::format("z{}", theBoard->mZombies.DataArrayGetID(aZombie));
-			aFigure.mKind = 'z';
-			aFigure.mRow = aZombie->mRow;
-			aFigure.mFacing = aZombie->IsWalkingBackwards() ? 1 : -1;
-			aFigure.mOrder = aZombie->mRenderOrder;
-			if (aWhack)
-			{
-				aFigure.mClickX = aFigure.mGameX + aFigure.mAtlas.mWidth / 2;
-				aFigure.mClickY = aFigure.mGameY + aFigure.mAtlas.mHeight / 2;
-			}
-			theFigures.push_back(aFigure);
-		}
-
-		// Plants by cell, so a pumpkin, a lily pad or a pot goes with what stands in it
-		std::vector<Plant*> aPlants;
-		for (Plant* aPlant : theBoard->mPlants)
-		{
-			if (!aPlant->mDead && aPlant->mOnBungeeState == PlantOnBungeeState::NOT_ON_BUNGEE)
-				aPlants.push_back(aPlant);
-		}
-		std::sort(aPlants.begin(), aPlants.end(), [](Plant* a, Plant* b) {
-			if (a->mPlantCol != b->mPlantCol || a->mRow != b->mRow)
-				return a->mPlantCol * MAX_GRID_SIZE_Y + a->mRow < b->mPlantCol * MAX_GRID_SIZE_Y + b->mRow;
-			return a->mRenderOrder < b->mRenderOrder;
-		});
-		for (size_t i = 0; i < aPlants.size();)
-		{
-			size_t aEnd = i + 1;
-			while (aEnd < aPlants.size() && aPlants[aEnd]->mPlantCol == aPlants[i]->mPlantCol && aPlants[aEnd]->mRow == aPlants[i]->mRow)
-				aEnd++;
-			Figure aFigure;
-			bool aDrawn = aPainter.Paint([&](Graphics* g) {
-				for (size_t j = i; j < aEnd; j++)
-				{
-					Plant* aPlant = aPlants[j];
-					if (aPlant->BeginDraw(g))
-					{
-						aPlant->Draw(g);
-						if ((aPlant->mSeedType == SeedType::SEED_MAGNETSHROOM || aPlant->mSeedType == SeedType::SEED_GOLD_MAGNET) && aPlant->DrawMagnetItemsOnTop())
-							aPlant->DrawMagnetItems(g);
-						aPlant->EndDraw(g);
-					}
-				}
-			}, aFigure);
-			if (aDrawn)
-			{
-				Plant* aMain = aPlants[aEnd - 1];
-				int aCol = aMain->mPlantCol, aRow = aMain->mRow;
-				bool aOnGrid = aCol >= 0 && aCol < MAX_GRID_SIZE_X && aRow >= 0 && aRow < MAX_GRID_SIZE_Y;
-				int aCellY = aOnGrid ? theBoard->GridToPixelY(aCol, aRow) : aMain->mY;
-				aFigure.mFeetX = aMain->mX + (aMain->mSeedType == SeedType::SEED_COBCANNON ? 80.0f : 40.0f);
-				aFigure.mFeetY = aCellY + 69.0f;
-				aFigure.mId = std::format("p{}", aCol * MAX_GRID_SIZE_Y + aRow);
-				aFigure.mKind = 'p';
-				aFigure.mRow = aRow;
-				aFigure.mOrder = aMain->mRenderOrder;
-				aFigure.mClickX = static_cast<int>(aFigure.mFeetX);
-				aFigure.mClickY = aCellY + 40;
-				theFigures.push_back(aFigure);
-			}
-			i = aEnd;
-		}
-
-		for (GridItem* aGridItem : theBoard->mGridItems)
-		{
-			if (aGridItem->mDead || aGridItem->mGridItemType == GridItemType::GRIDITEM_CRATER)
-				continue;
-			Figure aFigure;
-			if (!aPainter.Paint([&](Graphics* g) { aGridItem->DrawGridItem(g); }, aFigure))
-				continue;
-			aFigure.mFeetX = aFigure.mGameX + aFigure.mAtlas.mWidth / 2.0f;
-			aFigure.mFeetY = static_cast<float>(aFigure.mGameY + aFigure.mAtlas.mHeight);
-			aFigure.mId = std::format("g{}", theBoard->mGridItems.DataArrayGetID(aGridItem));
-			aFigure.mKind = 'g';
-			aFigure.mRow = aGridItem->mGridY;
-			aFigure.mOrder = aGridItem->mRenderOrder;
-			if (aGridItem->mGridX >= 0 && aGridItem->mGridX < MAX_GRID_SIZE_X && aGridItem->mGridY >= 0 && aGridItem->mGridY < MAX_GRID_SIZE_Y)
-			{
-				aFigure.mClickX = theBoard->GridToPixelX(aGridItem->mGridX, aGridItem->mGridY) + 40;
-				aFigure.mClickY = theBoard->GridToPixelY(aGridItem->mGridX, aGridItem->mGridY) + 40;
-			}
-			theFigures.push_back(aFigure);
-		}
-
-		for (LawnMower* aLawnMower : theBoard->mLawnMowers)
-		{
-			if (aLawnMower->mDead)
-				continue;
-			Figure aFigure;
-			if (!aPainter.Paint([&](Graphics* g) { aLawnMower->Draw(g); }, aFigure))
-				continue;
-			aFigure.mFeetX = aFigure.mGameX + aFigure.mAtlas.mWidth / 2.0f;
-			aFigure.mFeetY = static_cast<float>(aFigure.mGameY + aFigure.mAtlas.mHeight);
-			aFigure.mId = std::format("m{}", theBoard->mLawnMowers.DataArrayGetID(aLawnMower));
-			aFigure.mKind = 'm';
-			aFigure.mRow = aLawnMower->mRow;
-			aFigure.mOrder = aLawnMower->mRenderOrder;
-			theFigures.push_back(aFigure);
-		}
-
-		for (Coin* aCoin : theBoard->mCoins)
-		{
-			if (aCoin->mDead)
-				continue;
-			Figure aFigure;
-			if (!aPainter.Paint([&](Graphics* g) {
-					if (aCoin->BeginDraw(g))
-					{
-						aCoin->Draw(g);
-						aCoin->EndDraw(g);
-					}
-				}, aFigure))
-				continue;
-			// Up in the air by as much as it still has to fall (or has risen, on its way to the counter)
-			aFigure.mFeetX = aFigure.mGameX + aFigure.mAtlas.mWidth / 2.0f;
-			aFigure.mFeetY = aFigure.mGameY + aFigure.mAtlas.mHeight + std::max(0.0f, aCoin->mGroundY - aCoin->mPosY);
-			aFigure.mId = std::format("c{}", theBoard->mCoins.DataArrayGetID(aCoin));
-			aFigure.mKind = 'c';
-			aFigure.mRow = aCoin->mRow;
-			aFigure.mOrder = aCoin->mRenderOrder;
-			if (!aCoin->mIsBeingCollected)
-			{
-				aFigure.mClickX = aFigure.mGameX + aFigure.mAtlas.mWidth / 2;
-				aFigure.mClickY = aFigure.mGameY + aFigure.mAtlas.mHeight / 2;
-			}
-			theFigures.push_back(aFigure);
-		}
-
-		for (Projectile* aProjectile : theBoard->mProjectiles)
-		{
-			if (aProjectile->mDead)
-				continue;
-			Figure aFigure;
-			if (!aPainter.Paint([&](Graphics* g) {
-					if (aProjectile->BeginDraw(g))
-					{
-						aProjectile->Draw(g);
-						aProjectile->EndDraw(g);
-					}
-				}, aFigure))
-				continue;
-			float l, t, r, b;
-			if (aPainter.Measure([&](Graphics* g) {
-					if (aProjectile->BeginDraw(g))
-					{
-						aProjectile->DrawShadow(g);
-						aProjectile->EndDraw(g);
-					}
-				}, l, t, r, b))
-			{
-				aFigure.mFeetX = (l + r) / 2;
-				aFigure.mFeetY = (t + b) / 2;
-			}
-			else
-			{
-				aFigure.mFeetX = aFigure.mGameX + aFigure.mAtlas.mWidth / 2.0f;
-				aFigure.mFeetY = aProjectile->mShadowY + 5.0f;
-			}
-			aFigure.mId = std::format("b{}", theBoard->mProjectiles.DataArrayGetID(aProjectile));
-			aFigure.mKind = 'b';
-			aFigure.mRow = aProjectile->mRow;
-			aFigure.mFacing = aProjectile->mVelX < 0 ? -1 : 1;
-			aFigure.mOrder = aProjectile->mRenderOrder;
-			theFigures.push_back(aFigure);
-		}
-
 		std::string aObjects;
-		for (const Figure& aFigure : theFigures)
+		for (const ARScene::Figure& aFigure : theScene.mFigures)
 		{
 			if (!aObjects.empty())
 				aObjects += ',';
@@ -1273,15 +893,14 @@ namespace
 		}
 		std::string aLanes;
 		std::string aWater;
-		int aRows = theBoard->StageHasPool() ? 6 : 5;
-		for (int aRow = 0; aRow < aRows; aRow++)
+		for (int aRow = 0; aRow < theScene.mRows; aRow++)
 		{
-			aLanes += std::format("{}{}", aRow ? "," : "", theBoard->GridToPixelY(8, aRow));
-			aWater += std::format("{}{}", aRow ? "," : "", theBoard->mPlantRow[aRow] == PlantRowType::PLANTROW_POOL ? 1 : 0);
+			aLanes += std::format("{}{}", aRow ? "," : "", theScene.mLanes[aRow]);
+			aWater += std::format("{}{}", aRow ? "," : "", theScene.mWater[aRow] ? 1 : 0);
 		}
-		if (aPainter.mSkipped > 0)
-			PvzpLogLn("ARView: the atlas is full, {} figures left out", aPainter.mSkipped);
-		int aUsed = aPainter.UsedHeight();
+		if (theScene.mSkipped > 0)
+			PvzpLogLn("ARView: the atlas is full, {} figures left out", theScene.mSkipped);
+		int aUsed = theScene.mUsedHeight;
 		if (aUsed >= gAtlasHeight)
 		{
 			gAtlasHeight = aUsed;
@@ -1296,8 +915,9 @@ namespace
 		}
 		theJson = std::format("{{\"t\":{},\"aw\":{},\"ah\":{},\"bg\":{},\"bgx\":{},\"bgw\":{},\"bgh\":{},\"bt\":{},\"lanes\":[{}],\"water\":[{}],"
 			"\"hud\":{},\"meter\":{},\"msg\":{},\"o\":[{}]}}",
-			theNow, ATLAS_WIDTH, gAtlasHeight, gBackdropSerial, -BOARD_OFFSET, BACKDROP_WIDTH, BACKDROP_HEIGHT, static_cast<int>(theBoard->mBackground),
-			aLanes, aWater, aHasHud ? PanelJson(aHud) : "null", aHasMeter ? PanelJson(aMeter) : "null", aHasMessage ? PanelJson(aMessage) : "null", aObjects);
+			theNow, ATLAS_WIDTH, gAtlasHeight, gBackdropSerial, -BOARD_OFFSET, BACKDROP_WIDTH, BACKDROP_HEIGHT, theScene.mBackground,
+			aLanes, aWater, theScene.mHasHud ? PanelJson(theScene.mHud) : "null", theScene.mHasMeter ? PanelJson(theScene.mMeter) : "null",
+			theScene.mHasMessage ? PanelJson(theScene.mMessage) : "null", aObjects);
 		return gAtlasHeight;
 	}
 
@@ -1308,7 +928,7 @@ namespace
 			gSceneLive = false;
 			return;
 		}
-		Board* aBoard = SceneBoard();
+		Board* aBoard = ARScene::SceneBoard();
 		if (!aBoard)
 		{
 			if (gSceneLive)
@@ -1327,20 +947,13 @@ namespace
 		}
 		gLastScene = theNow;
 		GLInterface* aGL = gLawnApp->mGLInterface.get();
-		if (!gCanvas)
-		{
-			gCanvas = std::make_unique<GLImage>(aGL);
-			gCanvas->mWidth = FIGURE_PROBE * 2;
-			gCanvas->mHeight = FIGURE_PROBE * 2;
-			gCanvas->SetImageMode(false, false);
-		}
 
 		SceneJob aJob;
 		bool aNewBoard = aBoard != gBackdropBoard || static_cast<int>(aBoard->mBackground) != gBackdropType;
 		if (aNewBoard || theNow - gLastBackdrop >= BACKDROP_INTERVAL_MS)
 		{
 			gLastBackdrop = theNow;
-			if (PaintBackdrop(aGL, aBoard, aJob.mBackdrop))
+			if (ARScene::PaintBackdrop(aGL, aBoard, &aJob.mBackdrop))
 			{
 				uint32_t aHash = SampleHash(aJob.mBackdrop);
 				if (!aNewBoard && aHash == gBackdropHash)
@@ -1357,15 +970,13 @@ namespace
 		if (gBackdropSerial == 0)
 			return;
 
-		if (!aGL->BeginOffscreen(ATLAS_WIDTH, ATLAS_MAX_HEIGHT))
+		ARScene::Scene aScene;
+		if (!ARScene::PaintFigures(aGL, aBoard, aScene))
 			return;
-		std::vector<Figure> aFigures;
-		gDrawingFigures = true;
-		aJob.mAtlasHeight = PaintFigures(aGL, aBoard, theNow, aFigures, aJob.mJson);
-		gDrawingFigures = false;
+		aJob.mAtlasHeight = SceneJson(aScene, theNow, aJob.mJson);
 		aGL->EndOffscreen(&aJob.mAtlas, ATLAS_WIDTH, aJob.mAtlasHeight);
 		aJob.mRenderMs = SDL_GetTicks() - theNow;
-		gStatFigures = static_cast<uint32_t>(aFigures.size());
+		gStatFigures = static_cast<uint32_t>(aScene.mFigures.size());
 		{
 			std::lock_guard<std::mutex> aLock(gSceneJobMutex);
 			std::swap(gSceneJob, aJob);
@@ -1485,7 +1096,7 @@ bool ARView::HasViewer()
 
 bool ARView::DrawingFigures()
 {
-	return gDrawingFigures;
+	return ARScene::DrawingFigures();
 }
 
 #endif
