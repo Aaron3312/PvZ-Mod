@@ -2,6 +2,7 @@
 #include "ARScene.h"
 #include "LawnApp.h"
 #include "Lawn/Board.h"
+#include "Lawn/Coin.h"
 #include "PvzpLib/PvzpDebug.h"
 #include "SexyAppFramework/graphics/GLInterface.h"
 #include "SexyAppFramework/graphics/GLPlatform.h"
@@ -246,7 +247,7 @@ void main()
 	std::unordered_map<uint32_t, Track> gTracks;
 	uint32_t				gLastUpdate = 0;		// theNow of the last update
 	uint32_t				gLastSceneTicks = 0;	// SDL ticks of the last update, for the slides
-	const Board*			gSceneBoard = nullptr;
+	Board*					gSceneBoard = nullptr;
 	const Board*			gBackdropBoard = nullptr;
 	int						gBackdropType = -1;
 	uint32_t				gLastBackdrop = 0;
@@ -952,7 +953,8 @@ bool ARDiorama::Pick(const float theModel[16], const float theOrigin[3], const f
 	Vec3 aCam = gHaveCam ? gCam : o;
 	ShownNow(SDL_GetTicks(), aCam);
 
-	// A sun or coin first, even behind a plant: in the game they are drawn over everything
+	// A sun or coin first, even behind a plant: in the game they are drawn over everything. Clicked where it is
+	// now, as a falling sun has moved since the scene.
 	float aBest = -1;
 	int aX = 0, aY = 0;
 	for (const Shown& s : gShown)
@@ -966,6 +968,12 @@ bool ARDiorama::Pick(const float theModel[16], const float theOrigin[3], const f
 			aBest = t;
 			aX = f.mClickX;
 			aY = f.mClickY;
+			Coin* aCoin = gSceneBoard == ARScene::SceneBoard() ? gSceneBoard->mCoins.DataArrayTryToGet(static_cast<unsigned int>(f.mIndex)) : nullptr;
+			if (aCoin && !aCoin->mDead && !aCoin->mIsBeingCollected)
+			{
+				aX = static_cast<int>(aCoin->mPosX + aCoin->mWidth / 2);
+				aY = static_cast<int>(aCoin->mPosY + aCoin->mHeight / 2);
+			}
 		}
 	}
 	if (aBest < 0)

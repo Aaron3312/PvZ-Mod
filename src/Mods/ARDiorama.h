@@ -15,7 +15,9 @@ class LawnApp;
 // (OpenGL order). All calls on the game thread with the game's GL context current.
 namespace ARDiorama
 {
-	// Refreshes the figure atlas and the backdrop when a lawn is in play, at most every theIntervalMs.
+	// Refreshes the figure atlas and the backdrop when a lawn is in play, at most every theIntervalMs. theNow in
+	// milliseconds (SDL_GetTicks). It draws with the game's renderer into its textures: call it before setting up
+	// your own frame, as it leaves the viewport at the game's (mPresentationRect) and the game's program bound.
 	void	Update(LawnApp* theApp, uint32_t theNow, uint32_t theIntervalMs);
 
 	// True while there is a lawn to draw; menus and dialogs stay 2D.
@@ -29,7 +31,8 @@ namespace ARDiorama
 	float	BaseHeight();
 
 	// Draws the diorama: theModel is board to world (placement, turn and size), theView world to eye, theProj eye
-	// to clip. Depth test on; it doesn't clear and leaves the GL state as the game expects.
+	// to clip. Depth test on; it doesn't clear and leaves the GL state as the game expects. Needs a depth buffer,
+	// cleared by the caller each frame, and the caller's viewport. Positions slide between updates by SDL_GetTicks.
 	void	Draw(const float theModel[16], const float theView[16], const float theProj[16]);
 
 	// A tap along a world-space ray (theDir need not be normalized). True with the game coordinates (800x600) to

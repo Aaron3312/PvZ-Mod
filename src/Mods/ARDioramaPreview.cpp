@@ -4,6 +4,7 @@
 #include "Mods.h"
 #include "LawnApp.h"
 #include "Lawn/Board.h"
+#include "Lawn/Coin.h"
 #include "Lawn/CursorObject.h"
 #include "Lawn/Plant.h"
 #include "Lawn/SeedPacket.h"
@@ -281,6 +282,15 @@ namespace
 		return true;
 	}
 
+	int PlantsAt(Board* theBoard, int theCol, int theRow)
+	{
+		int aCount = 0;
+		for (Plant* aPlant : theBoard->mPlants)
+			if (!aPlant->mDead && aPlant->mPlantCol == theCol && aPlant->mRow == theRow)
+				aCount++;
+		return aCount;
+	}
+
 	void RunTest(uint32_t theNow)
 	{
 		static const char* sTest = SDL_getenv("PVZ_AR_DIORAMA_TEST");
@@ -293,7 +303,10 @@ namespace
 		static int sPlantCol = -1, sPlantRow = -1;
 		static int sPassed = 0, sFailed = 0;
 		static float sDragYaw = 0;
-		static unsigned int sDragPlants = 0;	// plants before a click that should (or shouldn't) plant
+		static unsigned int sDragPlants = 0;	// plants before the drag, which mustn't plant
+		static int sPlantsBefore = 0;
+		static unsigned int sCoinId = 0;
+		static int sCoinType = -1;
 		Board* aBoard = gLawnApp->mBoard;
 		if (!aBoard)
 			return;
@@ -354,8 +367,17 @@ namespace
 			sSunBefore = aBoard->mSunMoney;
 			float p[3];
 			int cx = 0, cy = 0;
+			sCoinId = 0;
 			if (ARDiorama::CoinPoint(p, &cx, &cy))
+			{
+				for (Coin* aCoin : aBoard->mCoins)
+					if (!aCoin->mDead && cx >= aCoin->mPosX && cx < aCoin->mPosX + aCoin->mWidth && cy >= aCoin->mPosY && cy < aCoin->mPosY + aCoin->mHeight)
+					{
+						sCoinId = aBoard->mCoins.DataArrayGetID(aCoin);
+						sCoinType = static_cast<int>(aCoin->mType);
+					}
 				ClickPoint("sun", p, cx, cy);
+			}
 			else
 				PvzpLogLn("ARDiorama test: no sun card");
 			Shot("pick-sol");
@@ -363,10 +385,15 @@ namespace
 			break;
 		}
 		case 2:
-			Check(std::format("sun collected (sun {} -> {})", sSunBefore, aBoard->mSunMoney).c_str(), aBoard->mSunMoney > sSunBefore);
+		{
+			// The sun, or a coin a zombie dropped if that card came first: collected either way
+			Coin* aCoin = sCoinId ? aBoard->mCoins.DataArrayTryToGet(sCoinId) : nullptr;
+			bool aCollected = aBoard->mSunMoney > sSunBefore || (sCoinId && (!aCoin || aCoin->mDead || aCoin->mIsBeingCollected));
+			Check(std::format("sun or coin collected (coin type {}, sun {} -> {})", sCoinType, sSunBefore, aBoard->mSunMoney).c_str(), aCollected);
 			aBoard->AddSunMoney(1000);
 			Next(300);
 			break;
+		}
 		case 3:
 		{
 			// The first seed packet with a free cell near the front, where nothing stands between it and the camera,
@@ -374,15 +401,24 @@ namespace
 			SeedBank* aBank = aBoard->mSeedBank.get();
 			int aPacketIndex = -1;
 			sPlantCol = sPlantRow = -1;
-			for (int i = 0; aBank && i < aBank->mNumPackets && aPacketIndex < 0; i++)
-				for (int aRow = aBoard->StageHasPool() ? 5 : 4; aRow >= 0 && aPacketIndex < 0; aRow--)
-					for (int aCol = 6; aCol >= 2 && aPacketIndex < 0; aCol--)
-						if (aBoard->CanPlantAt(aCol, aRow, aBank->mSeedPackets[i].mPacketType) == PlantingReason::PLANTING_OK && aBank->mSeedPackets[i].CanPickUp())
-						{
-							aPacketIndex = i;
-							sPlantCol = aCol;
-							sPlantRow = aRow;
-						}
+			for (int i = 0; aBank && i < aBank->mNumPackets; i++)
+				if (!aBank->mSeedPackets[i].mActive)
+					aBank->mSeedPackets[i].Activate();	// the defense the test planted may have left them recharging
+			for (int aTry = 0; aTry < 2 && aPacketIndex < 0; aTry++)
+			{
+				for (int i = 0; aBank && i < aBank->mNumPackets && aPacketIndex < 0; i++)
+					for (int aRow = aBoard->StageHasPool() ? 5 : 4; aRow >= 0 && aPacketIndex < 0; aRow--)
+						for (int aCol = 8; aCol >= 0 && aPacketIndex < 0; aCol--)
+							if (aBoard->CanPlantAt(aCol, aRow, aBank->mSeedPackets[i].mPacketType) == PlantingReason::PLANTING_OK && aBank->mSeedPackets[i].CanPickUp())
+							{
+								aPacketIndex = i;
+								sPlantCol = aCol;
+								sPlantRow = aRow;
+							}
+				// On the roof without a flower pot in the bank every pot may be taken: one more, to plant on
+				if (aPacketIndex < 0 && aTry == 0 && aBoard->StageHasRoof() && aBoard->CanPlantAt(7, 4, SeedType::SEED_FLOWERPOT) == PlantingReason::PLANTING_OK)
+					aBoard->AddPlant(7, 4, SeedType::SEED_FLOWERPOT);
+			}
 			if (aPacketIndex < 0)
 			{
 				PvzpLogLn("ARDiorama test: no seed packet with a free cell");
@@ -410,7 +446,8 @@ namespace
 				int gx = aBoard->GridToPixelX(sPlantCol, sPlantRow) + 40, gy = aBoard->GridToPixelY(sPlantCol, sPlantRow) + 40;
 				float p[3];
 				ARDiorama::LawnPoint(gx, gy, p);
-				sDragPlants = aBoard->mPlants.mSize;
+				sPlantsBefore = PlantsAt(aBoard, sPlantCol, sPlantRow);
+				sSunBefore = aBoard->mSunMoney;
 				ClickPoint("lawn cell", p, gx, gy);
 			}
 			else
@@ -420,9 +457,13 @@ namespace
 		}
 		case 5:
 		{
+			// One more plant on that cell (a pot on the roof is one already; elsewhere the defense may be eaten meanwhile)
 			Plant* aPlant = sPlantCol >= 0 ? aBoard->GetTopPlantAt(sPlantCol, sPlantRow, PlantPriority::TOPPLANT_ANY) : nullptr;
-			Check(std::format("planted at column {} row {} ({} plants -> {})", sPlantCol, sPlantRow, sDragPlants, aBoard->mPlants.mSize).c_str(),
-				aPlant != nullptr && aBoard->mPlants.mSize > sDragPlants);
+			CursorObject* aCursor = aBoard->mCursorObject.get();
+			int aPlants = sPlantCol >= 0 ? PlantsAt(aBoard, sPlantCol, sPlantRow) : 0;
+			Check(std::format("planted at column {} row {} (plants there {} -> {}, top type {}, sun {} -> {}, cursor {})", sPlantCol, sPlantRow, sPlantsBefore,
+				aPlants, aPlant ? static_cast<int>(aPlant->mSeedType) : -1, sSunBefore, aBoard->mSunMoney, aCursor ? static_cast<int>(aCursor->mCursorType) : -1).c_str(),
+				aPlants > sPlantsBefore);
 			Shot("pick-planta");
 			Next(1500);
 			break;
