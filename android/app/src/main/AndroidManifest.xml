@@ -10,6 +10,15 @@
     <!-- Versus mod mode: the phone can host a match that another device joins from a browser -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- "Ver en AR en este cel": ARCore with the camera, optional so the game runs without it -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera.ar"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <application
         android:allowBackup="true"
         android:extractNativeLibs="false"
@@ -20,6 +29,10 @@
         android:hasFragileUserData="true"
         android:enableOnBackInvokedCallback="true"
         android:supportsRtl="true">
+
+        <meta-data
+            android:name="com.google.ar.core"
+            android:value="optional" />
 
         <activity
             android:name=".PvZPortableActivity"

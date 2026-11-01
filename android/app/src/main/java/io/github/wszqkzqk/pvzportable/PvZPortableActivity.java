@@ -41,6 +41,10 @@ import java.io.File;
 
 public class PvZPortableActivity extends SDLActivity {
     private static final String TAG = "PvZPortable";
+    // Test switches that "adb shell am start ... --es NAME VALUE" may set for the game (SDL_getenv)
+    private static final String[] TEST_ENV = {
+        "PVZ_AR_NATIVE", "PVZ_AR_TEST_POSE", "PVZ_HACK_MENU_OPEN", "PVZ_MOD_TEST"
+    };
     private OnBackInvokedCallback mBackCallback;
 
     @Override
@@ -57,6 +61,7 @@ public class PvZPortableActivity extends SDLActivity {
         }
 
         super.onCreate(savedInstanceState);
+        passTestEnv();
         hideSystemUI();
         setupImeLayoutAdjustment();
 
@@ -87,6 +92,19 @@ public class PvZPortableActivity extends SDLActivity {
             mBackCallback = null;
         }
         super.onDestroy();
+    }
+
+    // Before the game's thread starts, so its first SDL_getenv sees them
+    private void passTestEnv() {
+        Bundle extras = getIntent() != null ? getIntent().getExtras() : null;
+        if (extras == null) return;
+        for (String name : TEST_ENV) {
+            String value = extras.getString(name);
+            if (value != null) {
+                Log.i(TAG, "Test switch " + name + "=" + value);
+                SDLActivity.nativeSetenv(name, value);
+            }
+        }
     }
 
     private void dispatchBackToSdl() {

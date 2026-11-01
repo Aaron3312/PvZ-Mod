@@ -21,6 +21,7 @@ PNG_VER=1.6.59
 JPEG_VER=3.1.4
 OPENMPT_VER=0.8.9
 GRADLE_VER=8.12
+ARCORE_VER=1.56.0	# also in android/app/build.gradle; the header is in third_party/arcore
 
 PREFIX="$WORK/prefix"
 SDL_PREFIX="$WORK/sdl2-android"
@@ -45,6 +46,7 @@ fetch "https://github.com/pnggroup/libpng/archive/refs/tags/v$PNG_VER.tar.gz" "l
 fetch "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/$JPEG_VER/libjpeg-turbo-$JPEG_VER.tar.gz" "libjpeg-turbo-$JPEG_VER.tar.gz"
 fetch "https://lib.openmpt.org/files/libopenmpt/src/libopenmpt-$OPENMPT_VER+release.makefile.tar.gz" "libopenmpt-$OPENMPT_VER.tar.gz"
 fetch "https://services.gradle.org/distributions/gradle-$GRADLE_VER-bin.zip" "gradle-$GRADLE_VER-bin.zip"
+fetch "https://dl.google.com/android/maven2/com/google/ar/core/$ARCORE_VER/core-$ARCORE_VER.aar" "arcore-$ARCORE_VER.aar"
 for f in "SDL2-$SDL_VER" "libpng-$PNG_VER" "libjpeg-turbo-$JPEG_VER" "libopenmpt-$OPENMPT_VER"; do
 	[ -d "$WORK/src/$f" ] || [ -d "$WORK/src/$f+release" ] || tar xzf "$WORK/dl/$f.tar.gz" -C "$WORK/src"
 done
@@ -75,8 +77,12 @@ if [ ! -f "$SDL_PREFIX/lib/libSDL2.so" ]; then
 	cmake --build "$WORK/obj/sdl2" -j"$JOBS" && cmake --install "$WORK/obj/sdl2"
 fi
 
+# libmain.so links against ARCore's C library; Gradle packages the same file from the AAR dependency.
+ARCORE_LIB="$WORK/arcore-$ARCORE_VER/jni/arm64-v8a/libarcore_sdk_c.so"
+[ -f "$ARCORE_LIB" ] || unzip -q -o "$WORK/dl/arcore-$ARCORE_VER.aar" "jni/arm64-v8a/libarcore_sdk_c.so" -d "$WORK/arcore-$ARCORE_VER"
+
 cmake -S "$ROOT" -B "$WORK/obj/game" "${NDK_ARGS[@]}" \
-	-DCMAKE_FIND_ROOT_PATH="$PREFIX;$SDL_PREFIX" -DSDL2_DIR="$SDL_PREFIX/lib/cmake/SDL2"
+	-DCMAKE_FIND_ROOT_PATH="$PREFIX;$SDL_PREFIX" -DSDL2_DIR="$SDL_PREFIX/lib/cmake/SDL2" -DPVZ_ARCORE_LIB="$ARCORE_LIB"
 cmake --build "$WORK/obj/game" -j"$JOBS"
 
 JNILIBS="$ROOT/android/app/src/main/jniLibs/arm64-v8a"

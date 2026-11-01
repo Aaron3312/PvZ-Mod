@@ -44,6 +44,10 @@ bool ARView::DrawingFigures()
 	return false;
 }
 
+void ARView::QueueMouse(Mouse, int, int)
+{
+}
+
 #else
 
 #include "ARViewPage.h"
@@ -1486,6 +1490,11 @@ bool ARView::HasViewer()
 bool ARView::DrawingFigures()
 {
 	return gDrawingFigures;
+}
+
+void ARView::QueueMouse(Mouse theAction, int theX, int theY)
+{
+	::QueueMouse(static_cast<MouseAction>(theAction), theX, theY);
 }
 
 #endif
