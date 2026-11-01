@@ -91,7 +91,7 @@ cp -L "$WORK/obj/game/libmain.so" "$SDL_PREFIX/lib/libSDL2.so" "$JNILIBS/"
 for so in "$JNILIBS"/*.so; do "$STRIP" --strip-unneeded "$so"; done
 
 # Gradle compiles SDL's Java classes from ../sdl2-src; they must match the native libSDL2.so.
-[ -e "$ROOT/sdl2-src" ] || ln -s "$WORK/src/SDL2-$SDL_VER" "$ROOT/sdl2-src"
+ln -sfn "$WORK/src/SDL2-$SDL_VER" "$ROOT/sdl2-src"	# always this WORK_DIR: an old link can dangle
 echo "sdk.dir=$ANDROID_HOME" > "$ROOT/android/local.properties"
 (cd "$ROOT/android" && "$WORK/gradle-$GRADLE_VER/bin/gradle" assembleRelease -PusePrebuiltLibs=true \
 	--no-daemon --max-workers="$JOBS" -Dorg.gradle.jvmargs=-Xmx2g)
