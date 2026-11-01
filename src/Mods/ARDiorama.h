@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-namespace Sexy { class LawnApp; }
+class LawnApp;
 
 // The lawn as a 3D diorama drawn by the game itself, for AR on the phone (no browser, no Mac): the backdrop as
 // the ground with the house and the sky as flats, and every plant, zombie, projectile, sun and mower as a
@@ -16,7 +16,7 @@ namespace Sexy { class LawnApp; }
 namespace ARDiorama
 {
 	// Refreshes the figure atlas and the backdrop when a lawn is in play, at most every theIntervalMs.
-	void	Update(Sexy::LawnApp* theApp, uint32_t theNow, uint32_t theIntervalMs);
+	void	Update(LawnApp* theApp, uint32_t theNow, uint32_t theIntervalMs);
 
 	// True while there is a lawn to draw; menus and dialogs stay 2D.
 	bool	HasScene();
