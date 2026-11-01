@@ -500,6 +500,9 @@ namespace
 
 void ARDioramaPreview::OnFrame()
 {
+#ifdef PVZ_AR_NATIVE
+	return;	// the phone has the real AR (ARNative); both would draw and the preview would take the taps
+#endif
 	static const bool sForced = [] {
 		const char* aEnv = SDL_getenv("PVZ_AR_DIORAMA");
 		return aEnv && *aEnv && SDL_strcmp(aEnv, "0") != 0;

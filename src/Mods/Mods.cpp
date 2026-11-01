@@ -56,6 +56,7 @@ namespace
 		{ "ModInfiniteCoins", &gSettings.mInfiniteCoins },
 		{ "ModARDiorama", &gSettings.mARDiorama },
 		{ "ModARView", &gSettings.mARView },
+		{ "ModARNative", &gSettings.mARNative },
 	};
 
 	// PVZ_MOD_TEST=1 drives the game without a mouse so new content can be checked on screen:

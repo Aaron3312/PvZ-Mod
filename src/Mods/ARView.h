@@ -14,6 +14,14 @@ namespace ARView
 	std::string	HintText();			// where to open the page (or why it can't listen), "" when off
 	bool		HasViewer();		// a phone is watching
 	bool		DrawingFigures();	// the diorama is drawing the objects one by one: they skip their 2D shadows
+
+	enum class Mouse
+	{
+		MOVE,
+		DOWN,
+		UP
+	};
+	void		QueueMouse(Mouse theAction, int theX, int theY);	// a tap from the phone's own AR (ARNative.cpp), game coordinates
 }
 
 #endif

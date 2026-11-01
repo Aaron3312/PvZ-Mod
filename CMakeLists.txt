@@ -152,6 +152,15 @@ if(PVZ_HACK_MENU)
 		INCLUDE_DIRECTORIES ${IMGUI_DIR}/gles2_shim
 	)
 endif()
+# Native AR on Android ("Ver en AR en este cel"): ARCore's C API. PVZ_ARCORE_LIB is libarcore_sdk_c.so from the
+# com.google.ar:core AAR (scripts/make-android-apk.sh unpacks it); without it the option isn't built.
+set(PVZ_ARCORE_LIB "" CACHE FILEPATH "libarcore_sdk_c.so for the native AR view (Android)")
+if(PVZ_HACK_MENU AND ANDROID AND PVZ_ARCORE_LIB)
+	list(APPEND SOURCES
+		src/Mods/ARNative.cpp
+	)
+	set(PVZ_AR_NATIVE ON)
+endif()
 
 if(EMSCRIPTEN)
 	list(PREPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMake")
@@ -314,6 +323,13 @@ elseif (NINTENDO_SWITCH)
 	)
 elseif (ANDROID)
 	target_link_libraries(pvz-portable PRIVATE GLESv2 EGL android log)
+	if(PVZ_AR_NATIVE)
+		# arcore_c_api.h 1.56.0 from google-ar/arcore-android-sdk, under the ARCore Additional Terms of Service
+		# (third_party/arcore/LICENSE, section 1)
+		target_include_directories(pvz-portable PRIVATE ${PROJECT_SOURCE_DIR}/third_party/arcore/include)
+		target_compile_definitions(pvz-portable PRIVATE PVZ_AR_NATIVE)
+		target_link_libraries(pvz-portable PRIVATE ${PVZ_ARCORE_LIB})
+	endif()
 	set_target_properties(pvz-portable PROPERTIES OUTPUT_NAME "main")
 elseif (IOS)
 	target_link_libraries(pvz-portable PRIVATE

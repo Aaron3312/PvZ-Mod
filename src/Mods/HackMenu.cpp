@@ -3,6 +3,7 @@
 #include "VersusNet.h"
 #include "ARView.h"
 #include "ARDioramaPreview.h"
+#include "ARNative.h"
 #include "Mods.h"
 #include "LawnApp.h"
 #include "Lawn/Board.h"
@@ -310,13 +311,23 @@ namespace
 
 		if (ImGui::CollapsingHeader("Ver en AR", ImGuiTreeNodeFlags_DefaultOpen))
 		{
+			if (ARNative::Available())
+			{
+				aChanged |= ImGui::Checkbox("Ver en AR en este cel", &s.mARNative);
+				ImGui::SetItemTooltip("El jardin sobre una mesa de verdad, con la camara de este cel (ARCore)");
+				std::string aStatus = ARNative::StatusText();
+				if (!aStatus.empty())
+					ImGui::TextWrapped("%s", aStatus.c_str());
+			}
 			aChanged |= ImGui::Checkbox("Ver en AR desde el celular", &s.mARView);
 			ImGui::SetItemTooltip("El juego en una mesa de verdad, con Chrome de Android (pagina /ar)");
 			std::string aHint = ARView::HintText();
 			if (!aHint.empty())
 				ImGui::TextWrapped("%s", aHint.c_str());
+#ifndef PVZ_AR_NATIVE
 			aChanged |= ImGui::Checkbox("Diorama 3D en la ventana", &s.mARDiorama);
 			ImGui::SetItemTooltip("El jardin en 3D aqui mismo: arrastra para girar, rueda para acercar, clic para jugar");
+#endif
 		}
 
 		ImGui::PopItemWidth();
@@ -324,6 +335,51 @@ namespace
 			Mods::Save(gLawnApp);
 
 		ImGui::End();
+	}
+
+	bool MenuEvent(const SDL_Event& theEvent)
+	{
+		if (!gReady || (!gOpen && !ARNative::OverlayShown()))
+		{
+			// A touch that went down on the menu stays the menu's until it ends, even if the menu closed.
+			bool aTouchMouse = (theEvent.type == SDL_MOUSEMOTION && theEvent.motion.which == SDL_TOUCH_MOUSEID) ||
+				((theEvent.type == SDL_MOUSEBUTTONDOWN || theEvent.type == SDL_MOUSEBUTTONUP) && theEvent.button.which == SDL_TOUCH_MOUSEID);
+			if (!gTouchOnMenu || !aTouchMouse)
+				return false;
+			if (theEvent.type != SDL_MOUSEMOTION)
+				gTouchOnMenu = false;
+			return true;
+		}
+
+		ImGui_ImplSDL2_ProcessEvent(&theEvent);
+		const ImGuiIO& io = ImGui::GetIO();
+		switch (theEvent.type)
+		{
+		case SDL_MOUSEMOTION:
+			if (theEvent.motion.which == SDL_TOUCH_MOUSEID)
+				return (theEvent.motion.state & SDL_BUTTON_LMASK) ? gTouchOnMenu : TouchOnMenu(theEvent.motion.x, theEvent.motion.y);
+			return io.WantCaptureMouse;
+		case SDL_MOUSEBUTTONDOWN:
+			if (theEvent.button.which == SDL_TOUCH_MOUSEID)
+				return gTouchOnMenu = TouchOnMenu(theEvent.button.x, theEvent.button.y);
+			return io.WantCaptureMouse;
+		case SDL_MOUSEBUTTONUP:
+			if (theEvent.button.which == SDL_TOUCH_MOUSEID)
+			{
+				bool aOnMenu = gTouchOnMenu;
+				gTouchOnMenu = false;
+				return aOnMenu;
+			}
+			return io.WantCaptureMouse;
+		case SDL_MOUSEWHEEL:
+			return io.WantCaptureMouse;
+		case SDL_KEYDOWN:
+		case SDL_KEYUP:
+		case SDL_TEXTINPUT:
+			return io.WantCaptureKeyboard;
+		default:
+			return false;
+		}
 	}
 
 	// Where to open the AR page, at the bottom of the screen until the phone connects. Drawn after the
@@ -345,49 +401,11 @@ bool HackMenu::ProcessEvent(const SDL_Event& theEvent)
 	if (IsToggleKey(theEvent) || IsToggleTouch(theEvent))
 	{
 		gOpen = !gOpen;
+		ARNative::CancelTouch();	// the fingers so far were the toggle, not taps on the AR view
 		return true;
 	}
-	if (!gReady || !gOpen)
-	{
-		// A touch that went down on the menu stays the menu's until it ends, even if the menu closed.
-		bool aTouchMouse = (theEvent.type == SDL_MOUSEMOTION && theEvent.motion.which == SDL_TOUCH_MOUSEID) ||
-			((theEvent.type == SDL_MOUSEBUTTONDOWN || theEvent.type == SDL_MOUSEBUTTONUP) && theEvent.button.which == SDL_TOUCH_MOUSEID);
-		if (!gTouchOnMenu || !aTouchMouse)
-			return false;
-		if (theEvent.type != SDL_MOUSEMOTION)
-			gTouchOnMenu = false;
-		return true;
-	}
-
-	ImGui_ImplSDL2_ProcessEvent(&theEvent);
-	const ImGuiIO& io = ImGui::GetIO();
-	switch (theEvent.type)
-	{
-	case SDL_MOUSEMOTION:
-		if (theEvent.motion.which == SDL_TOUCH_MOUSEID)
-			return (theEvent.motion.state & SDL_BUTTON_LMASK) ? gTouchOnMenu : TouchOnMenu(theEvent.motion.x, theEvent.motion.y);
-		return io.WantCaptureMouse;
-	case SDL_MOUSEBUTTONDOWN:
-		if (theEvent.button.which == SDL_TOUCH_MOUSEID)
-			return gTouchOnMenu = TouchOnMenu(theEvent.button.x, theEvent.button.y);
-		return io.WantCaptureMouse;
-	case SDL_MOUSEBUTTONUP:
-		if (theEvent.button.which == SDL_TOUCH_MOUSEID)
-		{
-			bool aOnMenu = gTouchOnMenu;
-			gTouchOnMenu = false;
-			return aOnMenu;
-		}
-		return io.WantCaptureMouse;
-	case SDL_MOUSEWHEEL:
-		return io.WantCaptureMouse;
-	case SDL_KEYDOWN:
-	case SDL_KEYUP:
-	case SDL_TEXTINPUT:
-		return io.WantCaptureKeyboard;
-	default:
-		return false;
-	}
+	// The menu and the AR view's controls are ImGui; what isn't on them may be the AR view's, then the game's.
+	return MenuEvent(theEvent) || ARNative::ProcessEvent(theEvent, gTouchOnMenu);
 }
 
 void HackMenu::RequestScreenshot(const char* thePngPath)
@@ -400,6 +418,7 @@ void HackMenu::Render()
 	VersusNet::OnFrame();	// before the menu is drawn, so the other computer doesn't see it
 	ARView::OnFrame();
 	ARDioramaPreview::OnFrame();	// after the phone's capture, before the shots: they see the diorama
+	ARNative::OnFrame();	// the camera and the board over the game, under the menu
 
 	if (!gScreenshotPath.empty() && gLawnApp && gLawnApp->mWindow)
 	{
@@ -411,7 +430,8 @@ void HackMenu::Render()
 	if (!gReady && !EnsureReady())
 		return;
 	std::string aARHint = ARView::HasViewer() ? "" : ARView::HintText();
-	if (!gOpen && aARHint.empty())
+	bool aAROverlay = ARNative::OverlayShown();
+	if (!gOpen && aARHint.empty() && !aAROverlay)
 		return;
 
 	// Only the hint on screen: leave the game's cursor alone
@@ -424,6 +444,8 @@ void HackMenu::Render()
 	if (aKeepCursor)
 		io.ConfigFlags &= ~ImGuiConfigFlags_NoMouseCursorChange;
 	ImGui::NewFrame();
+	if (aAROverlay)
+		ARNative::DrawOverlay(gScale);
 	if (gOpen)
 		DrawMenu();
 	if (!aARHint.empty())
