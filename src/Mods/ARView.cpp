@@ -784,6 +784,14 @@ namespace
 		PvzpLogLn("ARView: stopped");
 	}
 
+	// At exit the GL interface is gone before the statics are destroyed, and the canvas would reach it from its
+	// destructor (RemoveGLImage on a dead mutex aborted the game on quit). It is left alone then.
+	void StopAtExit()
+	{
+		Stop();
+		gCanvas.release();
+	}
+
 	void Start(uint32_t theNow)
 	{
 		gLastListenTry = std::max<uint32_t>(1, theNow);
@@ -822,7 +830,7 @@ namespace
 		static bool sAtExit = false;
 		if (!sAtExit)
 		{
-			std::atexit(Stop);
+			std::atexit(StopAtExit);
 			sAtExit = true;
 		}
 	}
