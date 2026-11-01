@@ -21,6 +21,18 @@
 #ifndef GL_TEXTURE_EXTERNAL_OES
 #define GL_TEXTURE_EXTERNAL_OES 0x8D65
 #endif
+#ifndef GL_VERTEX_ARRAY_BINDING
+#define GL_VERTEX_ARRAY_BINDING 0x85B5
+#endif
+
+// The few EGL calls needed, declared here: EGL/egl.h clashes with glad's Khronos platform header
+extern "C"
+{
+	void*			eglGetCurrentDisplay();
+	void*			eglGetCurrentContext();
+	void*			eglGetCurrentSurface(int32_t theReadDraw);
+	unsigned int	eglMakeCurrent(void* theDisplay, void* theDraw, void* theRead, void* theContext);
+}
 
 namespace
 {
@@ -450,8 +462,11 @@ void main(){
 		gDotsProgram = Program(DOTS_VS, DOTS_FS, { "aPos", "aEdge" });
 		if (!gCameraProgram || !gColorProgram || !gDotsProgram)
 			return false;
+		GLint aProgram = 0;	// the game draws with whatever program is current
+		glGetIntegerv(GL_CURRENT_PROGRAM, &aProgram);
 		glUseProgram(gCameraProgram);
 		glUniform1i(glGetUniformLocation(gCameraProgram, "uTex"), 0);
+		glUseProgram(static_cast<GLuint>(aProgram));
 		gCameraDim = glGetUniformLocation(gCameraProgram, "uDim");
 		gColorViewProj = glGetUniformLocation(gColorProgram, "uViewProj");
 		gColorPointSize = glGetUniformLocation(gColorProgram, "uPointSize");
@@ -464,10 +479,94 @@ void main(){
 		return true;
 	}
 
+	// ARCore draws with GLES 3 and leaves its own vertex array object bound after an update. The game's attribute
+	// pointers live in the default one (it is GLES 2 code), so that one is put back.
+	using BindVertexArrayProc = void (*)(GLuint);
+	BindVertexArrayProc BindVertexArray()
+	{
+		static BindVertexArrayProc sProc = [] {
+			auto aProc = reinterpret_cast<BindVertexArrayProc>(SDL_GL_GetProcAddress("glBindVertexArray"));
+			if (!aProc)
+				aProc = reinterpret_cast<BindVertexArrayProc>(SDL_GL_GetProcAddress("glBindVertexArrayOES"));
+			return aProc;
+		}();
+		return sProc;
+	}
+
+	// ARCore's update runs GLES 3 work of its own in the game's context (the camera image for its depth model) and
+	// doesn't put everything back. GLES 3 state the game never touches goes back to its defaults; a pixel unpack
+	// buffer left bound, for one, makes every texture the game uploads come out empty.
+	void ResetAfterARCore()
+	{
+		struct Check
+		{
+			const char*	mName;
+			GLenum		mWhat;
+			GLint		mDefault;
+		};
+		static const Check sChecks[] = {
+			{ "pixel unpack buffer", 0x88EF, 0 },	// GL_PIXEL_UNPACK_BUFFER_BINDING
+			{ "pixel pack buffer", 0x88ED, 0 },		// GL_PIXEL_PACK_BUFFER_BINDING
+			{ "unpack row length", 0x0CF2, 0 },
+			{ "unpack skip rows", 0x0CF3, 0 },
+			{ "unpack skip pixels", 0x0CF4, 0 },
+			{ "pack row length", 0x0D02, 0 },
+			{ "sampler", 0x8919, 0 },				// GL_SAMPLER_BINDING
+			{ "stencil test", GL_STENCIL_TEST, 0 },
+			{ "rasterizer discard", 0x8C89, 0 },
+			{ "polygon offset", GL_POLYGON_OFFSET_FILL, 0 },
+			{ "draw framebuffer", 0x8CA6, 0 },		// GL_DRAW_FRAMEBUFFER_BINDING
+			{ "read framebuffer", 0x8CAA, 0 },		// GL_READ_FRAMEBUFFER_BINDING
+		};
+		static int sLogged = 0;
+		for (const Check& c : sChecks)
+		{
+			GLint aValue = 0;
+			if (c.mWhat == GL_STENCIL_TEST || c.mWhat == 0x8C89 || c.mWhat == GL_POLYGON_OFFSET_FILL)
+				aValue = glIsEnabled(c.mWhat);
+			else
+				glGetIntegerv(c.mWhat, &aValue);
+			if (aValue != c.mDefault && sLogged < 12)
+			{
+				sLogged++;
+				PvzpLogLn("ARNative: update left {} at {}", c.mName, aValue);
+			}
+		}
+		GLboolean aMask[4] = { 1, 1, 1, 1 };
+		glGetBooleanv(GL_COLOR_WRITEMASK, aMask);
+		if (!(aMask[0] && aMask[1] && aMask[2] && aMask[3]) && sLogged < 12)
+		{
+			sLogged++;
+			PvzpLogLn("ARNative: update left the color mask at {}{}{}{}", aMask[0], aMask[1], aMask[2], aMask[3]);
+		}
+		glGetError();	// a GLES 2 driver would refuse some of the names above
+		glBindBuffer(0x88EC, 0);	// GL_PIXEL_UNPACK_BUFFER
+		glBindBuffer(0x88EB, 0);	// GL_PIXEL_PACK_BUFFER
+		glPixelStorei(0x0CF2, 0);
+		glPixelStorei(0x0CF3, 0);
+		glPixelStorei(0x0CF4, 0);
+		glPixelStorei(0x0D02, 0);
+		glPixelStorei(0x0D03, 0);
+		glPixelStorei(0x0D04, 0);
+		using BindSamplerProc = void (*)(GLuint, GLuint);
+		static BindSamplerProc sBindSampler = reinterpret_cast<BindSamplerProc>(SDL_GL_GetProcAddress("glBindSampler"));
+		if (sBindSampler)
+			for (GLuint i = 0; i < 4; i++)
+				sBindSampler(i, 0);
+		glDisable(GL_STENCIL_TEST);
+		glDisable(0x8C89);	// GL_RASTERIZER_DISCARD
+		glDisable(GL_POLYGON_OFFSET_FILL);
+		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		glDisable(GL_SAMPLE_COVERAGE);
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glGetError();
+	}
+
 	// The game sets its program, buffer and attribute pointers once and relies on them, like ImGui's backend does
 	// for its own: everything touched here is put back.
 	struct GLBackup
 	{
+		GLint		mVertexArray = 0;
 		GLint		mProgram = 0, mArrayBuffer = 0, mElementBuffer = 0, mActiveTexture = 0, mTexture = 0, mFramebuffer = 0;
 		GLint		mViewport[4] = {}, mScissor[4] = {};
 		GLint		mBlendSrcRgb = 0, mBlendDstRgb = 0, mBlendSrcAlpha = 0, mBlendDstAlpha = 0;
@@ -480,6 +579,8 @@ void main(){
 
 		GLBackup()
 		{
+			if (BindVertexArray())
+				glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &mVertexArray);
 			glGetIntegerv(GL_CURRENT_PROGRAM, &mProgram);
 			glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &mArrayBuffer);
 			glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &mElementBuffer);
@@ -511,8 +612,15 @@ void main(){
 			}
 		}
 
+		void RestoreVertexArray() const
+		{
+			if (BindVertexArray())
+				BindVertexArray()(static_cast<GLuint>(mVertexArray));
+		}
+
 		~GLBackup()
 		{
+			RestoreVertexArray();
 			for (GLuint i = 0; i < 3; i++)
 			{
 				const Attrib& a = mAttribs[i];
@@ -1355,6 +1463,17 @@ void main(){
 
 	// ---- per frame
 
+	void LogGLError(const char* theWhere)
+	{
+		static int sLogged = 0;
+		GLenum aError = glGetError();
+		if (aError != GL_NO_ERROR && sLogged < 20)
+		{
+			sLogged++;
+			PvzpLogLn("ARNative: GL error 0x{:x} after {}", static_cast<unsigned>(aError), theWhere);
+		}
+	}
+
 	void UpdateGeometry(uint32_t theNow)
 	{
 		int aWidth = 0, aHeight = 0;
@@ -1510,6 +1629,8 @@ void ARNative::OnFrame()
 		return;
 	if (gState == State::STOPPED)
 		return;
+	static const int sDebug = SDL_getenv("PVZ_AR_DEBUG") ? SDL_atoi(SDL_getenv("PVZ_AR_DEBUG")) : 0;
+	GLBackup aBackup;	// the game's GL state, before anything here touches it
 	if (gState != State::RUNNING)
 	{
 		Advance(aNow);
@@ -1517,7 +1638,6 @@ void ARNative::OnFrame()
 			return;
 	}
 
-	GLBackup aBackup;
 	if (gResumeWanted)
 	{
 		gResumeWanted = false;
@@ -1529,7 +1649,35 @@ void ARNative::OnFrame()
 		EndTouches();
 	}
 	UpdateGeometry(aNow);
-	ArStatus aStatus = ArSession_update(gSession, gFrame);
+	// ARCore may do GL work of its own in update; the game's context and surface must be current again after it
+	LogGLError("the game's frame");
+	constexpr int32_t EGL_DRAW_SURFACE = 0x3059, EGL_READ_SURFACE = 0x305A;
+	void* aDisplay = eglGetCurrentDisplay();
+	void* aContext = eglGetCurrentContext();
+	void* aDraw = eglGetCurrentSurface(EGL_DRAW_SURFACE);
+	void* aRead = eglGetCurrentSurface(EGL_READ_SURFACE);
+	ArStatus aStatus = (sDebug & 1) ? AR_ERROR_NOT_TRACKING : ArSession_update(gSession, gFrame);
+	static int sVaoLogs = 0;
+	if (sVaoLogs < 3 && BindVertexArray())
+	{
+		GLint aVertexArray = 0;
+		glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &aVertexArray);
+		if (aVertexArray != aBackup.mVertexArray)
+		{
+			sVaoLogs++;
+			PvzpLogLn("ARNative: update left vertex array {} bound (the game's is {})", aVertexArray, aBackup.mVertexArray);
+		}
+	}
+	aBackup.RestoreVertexArray();
+	ResetAfterARCore();
+	if (eglGetCurrentContext() != aContext || eglGetCurrentSurface(EGL_DRAW_SURFACE) != aDraw || eglGetCurrentSurface(EGL_READ_SURFACE) != aRead)
+	{
+		static int sSwitched = 0;
+		if (sSwitched++ < 5)
+			PvzpLogLn("ARNative: update changed the current EGL context or surface, putting the game's back");
+		eglMakeCurrent(aDisplay, aDraw, aRead, aContext);
+	}
+	LogGLError("update");
 	if (aStatus != AR_SUCCESS)
 	{
 		if (aStatus != gLastUpdateError)
@@ -1561,13 +1709,17 @@ void ARNative::OnFrame()
 	glViewport(0, 0, gViewW, gViewH);
 	if (!gShowing)
 	{
-		DrawCamera(true);
-		return;
+		if (!(sDebug & 2))
+			DrawCamera(true);
 	}
-	UpdateReticle();
-	UpdateAnchor();
-	FlushPress(aNow);
-	Draw();
+	else
+	{
+		UpdateReticle();
+		UpdateAnchor();
+		FlushPress(aNow);
+		Draw();
+	}
+	LogGLError("draw");
 }
 
 bool ARNative::ProcessEvent(const SDL_Event& theEvent, bool theTouchOnMenu)

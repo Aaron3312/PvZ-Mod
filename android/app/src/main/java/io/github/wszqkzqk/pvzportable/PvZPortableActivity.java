@@ -43,7 +43,7 @@ public class PvZPortableActivity extends SDLActivity {
     private static final String TAG = "PvZPortable";
     // Test switches that "adb shell am start ... --es NAME VALUE" may set for the game (SDL_getenv)
     private static final String[] TEST_ENV = {
-        "PVZ_AR_NATIVE", "PVZ_AR_TEST_POSE", "PVZ_HACK_MENU_OPEN", "PVZ_MOD_TEST"
+        "PVZ_AR_NATIVE", "PVZ_AR_TEST_POSE", "PVZ_AR_DEBUG", "PVZ_HACK_MENU_OPEN", "PVZ_MOD_TEST"
     };
     private OnBackInvokedCallback mBackCallback;
 
